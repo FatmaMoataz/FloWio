@@ -37,34 +37,27 @@ export default function Signup() {
     setForm({ ...form, [key]: value });
   };
 
+  // دالة مساعدة لإنشاء وحفظ إشعار الترحيب المحلي داخل الـ localStorage
+  const saveWelcomeNotification = (name) => {
+    const welcomeNotif = {
+      id: "welcome_" + Date.now(),
+      title: "Welcome to Flowio! 🚀",
+      message: `Hi ${name || "there"}, we're absolutely thrilled to have you here. Let's start managing your workflows perfectly!`,
+      type: "welcome",
+      is_read: false,
+      createdAt: new Date().toISOString(),
+      path: "/dashboard",
+      isLocal: true,
+    };
+    localStorage.setItem("local_notifications", JSON.stringify([welcomeNotif]));
+  };
+
   const inputStyle =
     "h-13.5 rounded-2xl border border-[#243d93]/40 bg-[#0b1246]/95 px-4 flex items-center gap-3 transition-all duration-300 shadow-[0_10px_25px_rgba(0,0,0,.18)] focus-within:border-[#6eb5ff] focus-within:shadow-[0_0_18px_rgba(95,150,255,.25)]";
 
   const inputClass =
     "w-full bg-transparent outline-none text-sm text-white placeholder:text-white/35";
 
-  // const submit = (e) => {
-  //   e.preventDefault();
-
-  //   if (
-  //     !form.fullName ||
-  //     !form.email ||
-  //     !form.password ||
-  //     !form.confirmPassword
-  //   ) {
-  //     alert("Please fill all required fields");
-  //     return;
-  //   }
-
-  //   if (form.password !== form.confirmPassword) {
-  //     alert("Passwords do not match");
-  //     return;
-  //   }
-
-  //   navigate("/dashboard");
-  // };
-
- // 1. HANDLER FOR STANDARD EMAIL/PASSWORD SIGNUP
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -86,16 +79,14 @@ export default function Signup() {
     try {
       setLoading(true);
 
-      // Sending data to your Node.js backend endpoint (e.g., /api/auth/signup)
       const response = await axios.post(`${BACKEND_URL}/api/auth/signup`, {
         fullName: form.fullName,
         email: form.email,
         password: form.password,
-        company: form.company, // Optional fields
-        role: form.role,       // Optional fields
+        company: form.company,
+        role: form.role,
       });
 
-      // Assuming your backend returns a token or user object on success
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
       }
@@ -105,6 +96,10 @@ export default function Signup() {
       }
 
       toast.success("Account created successfully!");
+      
+      // حفظ إشعار الترحيب المحلي الموحد بالاسم المكتوب
+      saveWelcomeNotification(form.fullName);
+      
       navigate("/dashboard");
     } catch (error) {
       console.error("Signup error:", error);
@@ -114,7 +109,6 @@ export default function Signup() {
     }
   };
 
-  // 2. HANDLER FOR GOOGLE SIGNUP POPUP
   const handleGoogleSubmit = async () => {
     if (!googleEmail) {
       toast.warning("Please enter your Gmail");
@@ -124,7 +118,6 @@ export default function Signup() {
     try {
       setLoading(true);
 
-      // Sending Google authentication payload to your backend endpoint (e.g., /api/auth/google)
       const response = await axios.post(`${BACKEND_URL}/api/auth/google`, {
         email: googleEmail,
       });
@@ -138,6 +131,10 @@ export default function Signup() {
       }
 
       setShowGooglePopup(false);
+      
+      // حفظ إشعار الترحيب لليوزر الجديد المسجل بجوجل
+      saveWelcomeNotification("");
+      
       navigate("/dashboard");
     } catch (error) {
       console.error("Google auth error:", error);

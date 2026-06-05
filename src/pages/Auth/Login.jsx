@@ -53,6 +53,20 @@ export default function Login() {
       }
 
       toast.success("Login successful!");
+      
+      // حفظ إشعار ترحيبي محلي موحد من خلال الـ localStorage
+      const welcomeNotif = {
+        id: "welcome_" + Date.now(),
+        title: "Welcome to Flowio! 🚀",
+        message: "Hi there, we're absolutely thrilled to have you here. Let's start managing your workflows perfectly!",
+        type: "welcome",
+        is_read: false,
+        createdAt: new Date().toISOString(),
+        path: "/dashboard",
+        isLocal: true,
+      };
+      localStorage.setItem("local_notifications", JSON.stringify([welcomeNotif]));
+
       navigate("/dashboard");
     } catch (error) {
       console.error("Login error:", error);

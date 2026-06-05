@@ -13,11 +13,13 @@ import {
   FaBell,
   FaArrowRight,
   FaChartBar,
+  FaRocket,
 } from "react-icons/fa";
 
-// خريطة لتحديد الأيقونات والألوان بناءً على الـ type القادم من الـ API
+// خريطة لتحديد الأيقونات والألوان بناءً على الـ type القادم من الـ API أو الـ localStorage
 const typeStyle = {
   system: { icon: <FaBell />, color: "bg-cyan-400/20 text-cyan-300" },
+  welcome: { icon: <FaRocket />, color: "bg-emerald-400/20 text-[#5fffd0] shadow-[0_0_15px_rgba(95,255,208,0.2)]" }, // الستايل الخاص بالترحيب محلياً 🚀
   task_assigned: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
   task_updated: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
   comment: { icon: <FaCheckCircle />, color: "bg-emerald-400/20 text-emerald-300" },
@@ -32,7 +34,7 @@ export default function Dashboard() {
 
   const token = localStorage.getItem("token");
 
-  // جلب الإشعارات من الـ API لقسم الـ Dashboard
+  // جلب الإشعارات من الـ API والـ localStorage لقسم الـ Dashboard
   useEffect(() => {
     if (!token) return;
 
@@ -44,23 +46,35 @@ export default function Dashboard() {
 
         if (!realUserId) return;
 
+        // 1. جلب الإشعارات الحقيقية من السيرفر
         const data = await notificationService.getUserNotifications(realUserId);
-        
-        // تحويل البيانات وعرض أحدث 4 إشعارات فقط
-        const transformed = (data.notifications || [])
+        const serverNotifs = data.notifications || [];
+
+        // 2. جلب الإشعارات المحلية الترحيبية من الـ localStorage
+        const localData = localStorage.getItem("local_notifications");
+        const localNotifs = localData ? JSON.parse(localData) : [];
+
+        // 3. دمج الإشعارات المحلية مع إشعارات الباك إند
+        const allNotifs = [...localNotifs, ...serverNotifs];
+
+        // تحويل البيانات وعرض أحدث 4 إشعارات فقط للحفاظ على ثبات الـ UI
+        const transformed = allNotifs
           .map((notif) => {
             const safeType = (notif.type || "system").toLowerCase();
             return {
-              id: notif._id,
+              id: notif._id || notif.id,
               title: notif.title || "No Title",
-              desc: notif.message || "",
+              desc: notif.message || notif.desc || "",
               style: typeStyle[safeType] || typeStyle.system,
-              time: notif.createdAt 
-                ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                : "",
+              time: notif.createdAt
+                ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : "Just Now",
+              rawCreatedAt: notif.createdAt,
             };
           })
-          .slice(0, 4); // تحديد العدد بـ 4 فقط للحفاظ على الـ UI ثابت
+          // ترتيب تنازلي حسب التاريخ عشان نضمن إن الأحدث (أو الترحيب التلقائي) يظهر أول حاجة فوق
+          .sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt))
+          .slice(0, 4);
 
         setNotifications(transformed);
       } catch (error) {

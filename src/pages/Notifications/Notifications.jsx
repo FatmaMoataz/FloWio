@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // ضفنا الـ navigate لو عاوزة توديه للباث
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import MainLayout from "../../layout/MainLayout";
@@ -13,40 +14,20 @@ import {
   FaTrash,
   FaEye,
   FaCheck,
+  FaRocket,
 } from "react-icons/fa";
 
 const typeStyle = {
-  system: {
-    icon: <FaBell />,
-    color: "from-[#6eb5ff] to-[#5b7dff]",
-  },
-  task_assigned: {
-    icon: <FaTasks />,
-    color: "from-[#ffb86b] to-[#ff7b54]",
-  },
-  task_updated: {
-    icon: <FaTasks />,
-    color: "from-[#ffb86b] to-[#ff7b54]",
-  },
-  comment: {
-    icon: <FaCheckCircle />,
-    color: "from-[#5fffd0] to-[#35b7ff]",
-  },
-  like: {
-    icon: <FaUsers />,
-    color: "from-[#ff5ea8] to-[#ff3d7f]",
-  },
-  mention: {
-    icon: <FaUsers />,
-    color: "from-[#ff5ea8] to-[#ff3d7f]",
-  },
-  polls: {
-    icon: <FaLaptopCode />,
-    color: "from-[#8f7cff] to-[#5b7dff]",
-  },
+  system: { icon: <FaBell />, color: "from-[#6eb5ff] to-[#5b7dff]" },
+  welcome: { icon: <FaRocket />, color: "from-[#5fffd0] to-[#5b7dff] shadow-[0_0_15px_rgba(95,255,208,0.4)]" },
+  task_assigned: { icon: <FaTasks />, color: "from-[#ffb86b] to-[#ff7b54]" },
+  task_updated: { icon: <FaTasks />, color: "from-[#ffb86b] to-[#ff7b54]" },
+  comment: { icon: <FaCheckCircle />, color: "from-[#5fffd0] to-[#35b7ff]" },
+  like: { icon: <FaUsers />, color: "from-[#ff5ea8] to-[#ff3d7f]" },
+  mention: { icon: <FaUsers />, color: "from-[#ff5ea8] to-[#ff3d7f]" },
+  polls: { icon: <FaLaptopCode />, color: "from-[#8f7cff] to-[#5b7dff]" },
 };
 
-// دالة مساعدة لتحديد القسم بناءً على التاريخ
 const getNotificationSection = (dateString) => {
   if (!dateString) return "Older";
   const notifDate = new Date(dateString);
@@ -54,16 +35,13 @@ const getNotificationSection = (dateString) => {
   let yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
 
-  if (notifDate.toDateString() === today.toDateString()) {
-    return "Today";
-  } else if (notifDate.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  } else {
-    return "Older";
-  }
+  if (notifDate.toDateString() === today.toDateString()) return "Today";
+  if (notifDate.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return "Older";
 };
 
 export default function Notifications() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -82,7 +60,6 @@ export default function Notifications() {
     const fetchNotifications = async () => {
       try {
         setLoading(true);
-
         const decoded = jwtDecode(token);
         const realUserId = decoded._id;
 
@@ -92,22 +69,35 @@ export default function Notifications() {
           return;
         }
 
+        // 1. جلب إشعارات السيرفر
         const data = await notificationService.getUserNotifications(realUserId);
+        const serverNotifs = data.notifications || [];
 
-        const transformedNotifications = (data.notifications || []).map(
-          (notif) => {
-            const safeType = (notif.type || "system").toLowerCase();
-            return {
-              id: notif._id,
-              title: notif.title || "No Title",
-              desc: notif.message || "",
-              type: typeStyle[safeType] ? safeType : "system",
-              read: notif.is_read || false,
-              time: notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
-              section: getNotificationSection(notif.createdAt), //  تم التعديل هنا
-            };
-          }
-        );
+        // 2. جلب الإشعارات المحلية
+        const localData = localStorage.getItem("local_notifications");
+        const localNotifs = localData ? JSON.parse(localData) : [];
+
+        // 3. الدمج
+        const allNotifs = [...localNotifs, ...serverNotifs];
+
+        const transformedNotifications = allNotifs.map((notif) => {
+          const safeType = (notif.type || "system").toLowerCase();
+          return {
+            id: notif._id || notif.id,
+            title: notif.title || "No Title",
+            desc: notif.message || notif.desc || "",
+            type: typeStyle[safeType] ? safeType : "system",
+            read: notif.is_read !== undefined ? notif.is_read : notif.read || false,
+            time: notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+            section: getNotificationSection(notif.createdAt),
+            isLocal: notif.isLocal || false,
+            path: notif.path || "/dashboard",
+            rawCreatedAt: notif.createdAt
+          };
+        });
+
+        // ترتيب تنازلي حسب التاريخ (الأحدث فوق)
+        transformedNotifications.sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt));
 
         setNotifications(transformedNotifications);
       } catch (error) {
@@ -122,15 +112,11 @@ export default function Notifications() {
   }, [token]);
 
   const filtered = notifications.filter((item) => {
-    const matchSearch = `${item.title} ${item.desc}`
-      .toLowerCase()
-      .includes(search.toLowerCase());
-
+    const matchSearch = `${item.title} ${item.desc}`.toLowerCase().includes(search.toLowerCase());
     const matchFilter =
       filter === "All" ||
       (filter === "Unread" && !item.read) ||
       (filter === "Read" && item.read);
-
     return matchSearch && matchFilter;
   });
 
@@ -143,9 +129,7 @@ export default function Notifications() {
   };
 
   const toggleSelect = (id) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
   const selectAll = () => {
@@ -154,49 +138,74 @@ export default function Notifications() {
 
   const markSelectedRead = async () => {
     try {
-      await Promise.all(
-        selected.map((id) => notificationService.markAsRead(id))
-      );
+      const selectedItems = notifications.filter(item => selected.includes(item.id));
+      
+      // تحديث السيرفر للإشعارات الحقيقية
+      const realUnread = selectedItems.filter(item => !item.isLocal && !item.read);
+      if (realUnread.length > 0) {
+        await Promise.all(realUnread.map((item) => notificationService.markAsRead(item.id)));
+      }
 
-      setNotifications((prev) =>
-        prev.map((item) =>
-          selected.includes(item.id) ? { ...item, read: true } : item
-        )
-      );
+      // تحديث الـ localStorage للإشعارات المحلية المختارة
+      const localData = localStorage.getItem("local_notifications");
+      if (localData) {
+        const updatedLocal = JSON.parse(localData).map(n => 
+          selected.includes(n.id || n._id) ? { ...n, is_read: true } : n
+        );
+        localStorage.setItem("local_notifications", JSON.stringify(updatedLocal));
+      }
+
+      setNotifications((prev) => prev.map((item) => selected.includes(item.id) ? { ...item, read: true } : item));
       setSelected([]);
       toast.success("Marked as read");
     } catch (error) {
       console.error("Mark as read error:", error);
-      toast.error(error.message || "Failed to mark notifications as read");
     }
   };
 
   const deleteSelected = async () => {
     try {
-      await Promise.all(
-        selected.map((id) => notificationService.deleteNotification(id))
-      );
+      const selectedItems = notifications.filter(item => selected.includes(item.id));
 
-      setNotifications((prev) =>
-        prev.filter((item) => !selected.includes(item.id))
-      );
+      // حذف من السيرفر
+      const realItems = selectedItems.filter(item => !item.isLocal);
+      if (realItems.length > 0) {
+        await Promise.all(realItems.map((item) => notificationService.deleteNotification(item.id)));
+      }
+
+      // حذف من الـ localStorage
+      const localData = localStorage.getItem("local_notifications");
+      if (localData) {
+        const filteredLocal = JSON.parse(localData).filter(n => !selected.includes(n.id || n._id));
+        localStorage.setItem("local_notifications", JSON.stringify(filteredLocal));
+      }
+
+      setNotifications((prev) => prev.filter((item) => !selected.includes(item.id)));
       setSelected([]);
       toast.success("Notifications deleted");
     } catch (error) {
       console.error("Delete notifications error:", error);
-      toast.error(error.message || "Failed to delete notifications");
     }
   };
 
-  const markOneRead = async (id) => {
+  const handleDetailsClick = async (item) => {
     try {
-      await notificationService.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, read: true } : item))
-      );
+      if (item.isLocal) {
+        const localData = localStorage.getItem("local_notifications");
+        if (localData) {
+          const updatedLocal = JSON.parse(localData).map(n => 
+            (n.id === item.id || n._id === item.id) ? { ...n, is_read: true } : n
+          );
+          localStorage.setItem("local_notifications", JSON.stringify(updatedLocal));
+        }
+      } else {
+        await notificationService.markAsRead(item.id);
+      }
+
+      setNotifications((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)));
+      navigate(item.path); // انتقال للمسار المحدد للإشعار الترحيبي أو غيره
     } catch (error) {
       console.error("Mark as read error:", error);
-      toast.error(error.message || "Failed to mark as read");
     }
   };
 
@@ -204,6 +213,7 @@ export default function Notifications() {
     <MainLayout title="Notifications">
       <div className="h-full min-h-0 text-white">
         <div className="flex h-full min-h-0 flex-col rounded-[28px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)]">
+          
           {/* TOP TOOLS */}
           <div className="mb-5 flex items-center justify-between gap-5">
             <div className="flex h-11 w-[360px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
@@ -238,22 +248,12 @@ export default function Notifications() {
 
           {selected.length > 0 && (
             <div className="mb-5 flex items-center justify-between rounded-[20px] border border-blue-300/10 bg-[#10184c]/90 px-5 py-3">
-              <span className="text-xs text-white/60">
-                {selected.length} notification selected
-              </span>
-
+              <span className="text-xs text-white/60">{selected.length} notification selected</span>
               <div className="flex gap-3">
-                <button
-                  onClick={markSelectedRead}
-                  className="flex h-9 items-center gap-2 rounded-full bg-blue-400/15 px-4 text-xs font-bold text-[#78aaff] hover:bg-blue-400/25"
-                >
+                <button onClick={markSelectedRead} className="flex h-9 items-center gap-2 rounded-full bg-blue-400/15 px-4 text-xs font-bold text-[#78aaff] hover:bg-blue-400/25">
                   <FaCheck /> Mark read
                 </button>
-
-                <button
-                  onClick={deleteSelected}
-                  className="flex h-9 items-center gap-2 rounded-full bg-red-400/15 px-4 text-xs font-bold text-[#ff6b8a] hover:bg-red-400/25"
-                >
+                <button onClick={deleteSelected} className="flex h-9 items-center gap-2 rounded-full bg-red-400/15 px-4 text-xs font-bold text-[#ff6b8a] hover:bg-red-400/25">
                   <FaTrash /> Delete
                 </button>
               </div>
@@ -269,9 +269,7 @@ export default function Notifications() {
                 </div>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-[18px] bg-[#10184c]/60 p-4 text-xs text-white/35">
-                No notifications found.
-              </div>
+              <div className="rounded-[18px] bg-[#10184c]/60 p-4 text-xs text-white/35">No notifications found.</div>
             ) : (
               sectionsToRender.map((section) => {
                 const sectionItems = grouped[section] || [];
@@ -280,9 +278,7 @@ export default function Notifications() {
                 return (
                   <div key={section} className="mb-7">
                     <div className="mb-3 flex items-center gap-4">
-                      <span className="text-[12px] font-bold text-white/45">
-                        {section}
-                      </span>
+                      <span className="text-[12px] font-bold text-white/45">{section}</span>
                       <div className="h-px flex-1 bg-white/10" />
                     </div>
 
@@ -297,52 +293,39 @@ export default function Notifications() {
                             className={`grid min-h-18.5 grid-cols-[28px_46px_1fr_110px_95px] items-center gap-4 rounded-[22px] border px-4 py-3 transition-all duration-300 ${
                               isSelected
                                 ? "border-blue-300/30 bg-gradient-to-r from-[#1c2a87]/95 to-[#141f69]/95 shadow-[0_0_22px_rgba(95,150,255,.22)]"
+                                : item.type === "welcome"
+                                ? "border-cyan-500/20 bg-gradient-to-r from-[#1a236a] to-[#10184c]/90 hover:bg-[#151f62]"
                                 : "border-white/5 bg-[#10184c]/80 hover:-translate-y-1 hover:bg-[#151f62]"
                             }`}
                           >
                             <button
                               onClick={() => toggleSelect(item.id)}
                               className={`flex h-4 w-4 items-center justify-center rounded border ${
-                                isSelected
-                                  ? "border-transparent bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff]"
-                                  : "border-white/35"
+                                isSelected ? "border-transparent bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff]" : "border-white/35"
                               }`}
                             >
                               {isSelected && <FaCheck className="text-[8px]" />}
                             </button>
 
-                            <div
-                              className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b ${style.color} text-white shadow-[0_0_18px_rgba(95,150,255,.25)]`}
-                            >
+                            <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b ${style.color} text-white shadow-[0_0_18px_rgba(95,150,255,.25)]`}>
                               {style.icon}
                             </div>
 
                             <div>
                               <div className="flex items-center gap-2">
-                                <h3 className="text-[13px] font-bold">
-                                  {item.title}
-                                </h3>
-
-                                {!item.read && (
-                                  <span className="h-2 w-2 rounded-full bg-[#6eb5ff]" />
-                                )}
+                                <h3 className="text-[13px] font-bold">{item.title}</h3>
+                                {!item.read && <span className="h-2 w-2 rounded-full bg-[#6eb5ff]" />}
                               </div>
-
-                              <p className="mt-1 text-[11px] text-white/55">
-                                {item.desc}
-                              </p>
+                              <p className="mt-1 text-[11px] text-white/55">{item.desc}</p>
                             </div>
 
-                            <span className="text-[10px] text-white/40">
-                              {item.time}
-                            </span>
+                            <span className="text-[10px] text-white/40">{item.time}</span>
 
                             <button
-                              onClick={() => markOneRead(item.id)}
+                              onClick={() => handleDetailsClick(item)}
                               className="flex h-9 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-[11px] font-bold text-white shadow-[0_0_15px_rgba(95,150,255,.25)] transition hover:brightness-110"
                             >
-                              <FaEye />
-                              Details
+                              <FaEye /> Details
                             </button>
                           </div>
                         );

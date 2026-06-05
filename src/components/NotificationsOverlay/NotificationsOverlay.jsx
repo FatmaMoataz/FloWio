@@ -9,13 +9,17 @@ import {
   FaUsers,
   FaTasks,
   FaLaptopCode,
+  FaRocket,
 } from "react-icons/fa";
 
-// الألوان والأيقونات الديناميكية حسب النوع
 const typeStyle = {
   system: {
     icon: <FaBell />,
     color: "from-[#6eb5ff] to-[#5b7dff]",
+  },
+  welcome: {
+    icon: <FaRocket />,
+    color: "from-[#5fffd0] to-[#5b7dff] shadow-[0_0_15px_rgba(95,255,208,0.4)]",
   },
   task_assigned: {
     icon: <FaTasks />,
@@ -43,7 +47,6 @@ const typeStyle = {
   },
 };
 
-// دالة تقسيم التاريخ ديناميكياً
 const getNotificationSection = (dateString) => {
   if (!dateString) return "Older";
   const notifDate = new Date(dateString);
@@ -51,13 +54,9 @@ const getNotificationSection = (dateString) => {
   let yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
 
-  if (notifDate.toDateString() === today.toDateString()) {
-    return "Today";
-  } else if (notifDate.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  } else {
-    return "Older";
-  }
+  if (notifDate.toDateString() === today.toDateString()) return "Today";
+  if (notifDate.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return "Older";
 };
 
 export default function NotificationsOverlay({ onClose }) {
@@ -67,7 +66,6 @@ export default function NotificationsOverlay({ onClose }) {
 
   const token = localStorage.getItem("token");
 
-  // جلب الإشعارات من السيرفر
   useEffect(() => {
     if (!token) return;
 
@@ -79,26 +77,40 @@ export default function NotificationsOverlay({ onClose }) {
 
         if (!realUserId) return;
 
+        // 1. جلب إشعارات السيرفر
         const data = await notificationService.getUserNotifications(realUserId);
+        const serverNotifs = data.notifications || [];
 
-        const transformed = (data.notifications || []).map((notif) => {
+        // 2. جلب الإشعارات المحلية المخزنة بالـ localStorage
+        const localData = localStorage.getItem("local_notifications");
+        const localNotifs = localData ? JSON.parse(localData) : [];
+
+        // 3. دمجهم سوا
+        const allNotifs = [...localNotifs, ...serverNotifs];
+
+        const transformed = allNotifs.map((notif) => {
           const safeType = (notif.type || "system").toLowerCase();
           return {
-            id: notif._id,
+            id: notif._id || notif.id,
             title: notif.title || "No Title",
-            desc: notif.message || "",
+            desc: notif.message || notif.desc || "",
             type: typeStyle[safeType] ? safeType : "system",
-            read: notif.is_read || false,
+            read: notif.is_read !== undefined ? notif.is_read : notif.read || false,
             time: notif.createdAt
               ? new Date(notif.createdAt).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
                 })
-              : "",
+              : "Just Now",
             section: getNotificationSection(notif.createdAt),
-            path: notif.path || "/notifications", // الباث اللي هيروح عليه لو مبعوت من الـ backend
+            path: notif.path || "/notifications",
+            isLocal: notif.isLocal || false,
+            rawCreatedAt: notif.createdAt,
           };
         });
+
+        // ترتيب تنازلي عشان الأحدث يظهر فوق دايماً
+        transformed.sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt));
 
         setNotifications(transformed);
       } catch (error) {
@@ -111,18 +123,27 @@ export default function NotificationsOverlay({ onClose }) {
     fetchNotifications();
   }, [token]);
 
-  // حساب عدد غير المقروء ديناميكياً
   const unreadCount = notifications.filter((item) => !item.read).length;
 
-  // جعل كل الإشعارات مقروءة في السيرفر والـ UI
   const markAllAsRead = async () => {
     const unreadNotifications = notifications.filter((item) => !item.read);
     if (unreadNotifications.length === 0) return;
 
     try {
-      await Promise.all(
-        unreadNotifications.map((item) => notificationService.markAsRead(item.id))
-      );
+      // تحديث إشعارات السيرفر الحقيقية
+      const realUnread = unreadNotifications.filter(item => !item.isLocal);
+      if (realUnread.length > 0) {
+        await Promise.all(
+          realUnread.map((item) => notificationService.markAsRead(item.id))
+        );
+      }
+
+      // تحديث الإشعارات المحلية في الـ localStorage لتبدو كـ مقروءة
+      const localData = localStorage.getItem("local_notifications");
+      if (localData) {
+        const updatedLocal = JSON.parse(localData).map(n => ({ ...n, is_read: true }));
+        localStorage.setItem("local_notifications", JSON.stringify(updatedLocal));
+      }
 
       setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
       toast.success("All notifications marked as read");
@@ -132,10 +153,21 @@ export default function NotificationsOverlay({ onClose }) {
     }
   };
 
-  // فتح إشعار معين وتحديث حالته ومغادرة الـ Overlay
-  const openNotification = async (id, path) => {
+  const openNotification = async (id, path, isLocal) => {
     try {
-      await notificationService.markAsRead(id);
+      if (isLocal) {
+        // تحديث حالة الإشعار المحلي الفردي داخل الـ localStorage
+        const localData = localStorage.getItem("local_notifications");
+        if (localData) {
+          const updatedLocal = JSON.parse(localData).map(n => 
+            (n.id === id || n._id === id) ? { ...n, is_read: true } : n
+          );
+          localStorage.setItem("local_notifications", JSON.stringify(updatedLocal));
+        }
+      } else {
+        await notificationService.markAsRead(id);
+      }
+
       setNotifications((prev) =>
         prev.map((item) => (item.id === id ? { ...item, read: true } : item))
       );
@@ -147,7 +179,6 @@ export default function NotificationsOverlay({ onClose }) {
     navigate(path);
   };
 
-  // تجميع الإشعارات بناءً على الـ section المحسوب ديناميكياً
   const sectionsToRender = ["Today", "Yesterday", "Older"];
   const grouped = {
     Today: notifications.filter((item) => item.section === "Today"),
@@ -161,11 +192,8 @@ export default function NotificationsOverlay({ onClose }) {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-[20px] font-bold text-white">Notifications</h3>
-            <p className="mt-1 text-[11px] text-white/45">
-              Stay updated with your workspace
-            </p>
+            <p className="mt-1 text-[11px] text-white/45">Stay updated with your workspace</p>
           </div>
-
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-[#69b5ff] to-[#6178ff] text-white shadow-[0_0_20px_rgba(95,150,255,.35)]">
             <FaBell />
           </div>
@@ -173,20 +201,13 @@ export default function NotificationsOverlay({ onClose }) {
 
         <div className="mt-4 flex items-center justify-between">
           {unreadCount > 0 ? (
-            <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[10px] font-bold text-[#78aaff]">
-              {unreadCount} Unread
-            </span>
+            <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[10px] font-bold text-[#78aaff]">{unreadCount} Unread</span>
           ) : (
-            <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[10px] font-bold text-[#5fffd0]">
-              All Read
-            </span>
+            <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[10px] font-bold text-[#5fffd0]">All Read</span>
           )}
 
           {unreadCount > 0 && (
-            <button
-              onClick={markAllAsRead}
-              className="text-[11px] font-semibold text-cyan-300 transition hover:text-cyan-100"
-            >
+            <button onClick={markAllAsRead} className="text-[11px] font-semibold text-cyan-300 transition hover:text-cyan-100">
               Mark all as read
             </button>
           )}
@@ -195,13 +216,9 @@ export default function NotificationsOverlay({ onClose }) {
 
       <div className="max-h-[430px] overflow-y-auto p-5">
         {loading ? (
-          <div className="py-8 text-center text-xs text-white/40">
-            Loading notifications...
-          </div>
+          <div className="py-8 text-center text-xs text-white/40">Loading notifications...</div>
         ) : notifications.length === 0 ? (
-          <div className="py-8 text-center text-xs text-white/35">
-            No notifications found.
-          </div>
+          <div className="py-8 text-center text-xs text-white/35">No notifications found.</div>
         ) : (
           sectionsToRender.map((section) => {
             const sectionItems = grouped[section] || [];
@@ -209,9 +226,7 @@ export default function NotificationsOverlay({ onClose }) {
 
             return (
               <div key={section} className="mb-6 last:mb-0">
-                <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[2px] text-white/35">
-                  {section}
-                </h4>
+                <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[2px] text-white/35">{section}</h4>
 
                 <div className="space-y-3">
                   {sectionItems.map((item) => {
@@ -220,15 +235,14 @@ export default function NotificationsOverlay({ onClose }) {
                     return (
                       <button
                         key={item.id}
-                        onClick={() => openNotification(item.id, item.path)}
-                        className="group w-full rounded-[20px] border border-white/5 bg-[#10184c]/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-[#151f62] hover:shadow-[0_0_20px_rgba(95,150,255,.15)]"
+                        onClick={() => openNotification(item.id, item.path, item.isLocal)}
+                        className={`group w-full rounded-[20px] border border-white/5 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-[#151f62] hover:shadow-[0_0_20px_rgba(95,150,255,.15)] ${
+                          item.type === "welcome" ? "bg-gradient-to-r from-[#1a236a] to-[#10184c] border-cyan-500/20" : "bg-[#10184c]/70"
+                        }`}
                       >
                         <div className="flex gap-4">
-                          <div
-                            className={`relative flex h-11 w-11 min-w-[44px] items-center justify-center rounded-full bg-gradient-to-b ${style.color} text-white shadow-[0_0_15px_rgba(95,150,255,.25)]`}
-                          >
+                          <div className={`relative flex h-11 w-11 min-w-[44px] items-center justify-center rounded-full bg-gradient-to-b ${style.color} text-white`}>
                             {style.icon}
-
                             {!item.read && (
                               <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#10184c] bg-[#5fffd0]" />
                             )}
@@ -236,18 +250,10 @@ export default function NotificationsOverlay({ onClose }) {
 
                           <div className="flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <h5 className="text-[13px] font-bold text-white">
-                                {item.title}
-                              </h5>
-
-                              <span className="text-[10px] text-white/40">
-                                {item.time}
-                              </span>
+                              <h5 className="text-[13px] font-bold text-white">{item.title}</h5>
+                              <span className="text-[10px] text-white/40">{item.time}</span>
                             </div>
-
-                            <p className="mt-2 text-[11px] leading-relaxed text-white/55">
-                              {item.desc}
-                            </p>
+                            <p className="mt-2 text-[11px] leading-relaxed text-white/55">{item.desc}</p>
                           </div>
                         </div>
                       </button>
