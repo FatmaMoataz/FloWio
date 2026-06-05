@@ -7,8 +7,8 @@ import notificationService from "../../services/notificationService";
 import {
   FaProjectDiagram,
   FaTasks,
-  FaUsers,
   FaCalendarAlt,
+  FaUsers,
   FaCheckCircle,
   FaBell,
   FaArrowRight,
@@ -19,7 +19,7 @@ import {
 // خريطة لتحديد الأيقونات والألوان بناءً على الـ type القادم من الـ API أو الـ localStorage
 const typeStyle = {
   system: { icon: <FaBell />, color: "bg-cyan-400/20 text-cyan-300" },
-  welcome: { icon: <FaRocket />, color: "bg-emerald-400/20 text-[#5fffd0] shadow-[0_0_15px_rgba(95,255,208,0.2)]" }, // الستايل الخاص بالترحيب محلياً 🚀
+  welcome: { icon: <FaRocket />, color: "bg-emerald-400/20 text-[#5fffd0] shadow-[0_0_15px_rgba(95,255,208,0.2)]" },
   task_assigned: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
   task_updated: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
   comment: { icon: <FaCheckCircle />, color: "bg-emerald-400/20 text-emerald-300" },
@@ -31,60 +31,102 @@ const typeStyle = {
 export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [loadingNotif, setLoadingNotif] = useState(true);
+  
+  // States جديدة عشان نخلي الـ KPIs ديناميكية بالكامل
+  const [projectStats, setProjectStats] = useState({ total: 0, active: 0 });
+  const [loadingProjects, setLoadingProjects] = useState(true);
 
   const token = localStorage.getItem("token");
 
-  // جلب الإشعارات من الـ API والـ localStorage لقسم الـ Dashboard
   useEffect(() => {
     if (!token) return;
 
-    const fetchDashboardNotifications = async () => {
+    const fetchDashboardData = async () => {
       try {
         setLoadingNotif(true);
         const decoded = jwtDecode(token);
         const realUserId = decoded._id;
+        
+        let companyId = decoded.companyId || decoded.company || localStorage.getItem("companyId");
+        if (!companyId && decoded.role === "system-admin") {
+          companyId = "66391d5bb96fa3ef34a8145b";
+          localStorage.setItem("companyId", companyId);
+        }
 
-        if (!realUserId) return;
+        // 1. جلب الإشعارات من السيرفر والـ LocalStorage
+        if (realUserId) {
+          try {
+            const data = await notificationService.getUserNotifications(realUserId);
+            const serverNotifs = data.notifications || [];
+            const localData = localStorage.getItem("local_notifications");
+            const localNotifs = localData ? JSON.parse(localData) : [];
+            const allNotifs = [...localNotifs, ...serverNotifs];
 
-        // 1. جلب الإشعارات الحقيقية من السيرفر
-        const data = await notificationService.getUserNotifications(realUserId);
-        const serverNotifs = data.notifications || [];
+            const transformed = allNotifs
+              .map((notif) => {
+                const safeType = (notif.type || "system").toLowerCase();
+                return {
+                  id: notif._id || notif.id,
+                  title: notif.title || "No Title",
+                  desc: notif.message || notif.desc || "",
+                  style: typeStyle[safeType] || typeStyle.system,
+                  time: notif.createdAt
+                    ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : "Just Now",
+                  rawCreatedAt: notif.createdAt,
+                };
+              })
+              .sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt))
+              .slice(0, 4);
 
-        // 2. جلب الإشعارات المحلية الترحيبية من الـ localStorage
-        const localData = localStorage.getItem("local_notifications");
-        const localNotifs = localData ? JSON.parse(localData) : [];
+            setNotifications(transformed);
+          } catch (err) {
+            console.error("Error fetching notifications:", err);
+          } finally {
+            setLoadingNotif(false);
+          }
+        }
 
-        // 3. دمج الإشعارات المحلية مع إشعارات الباك إند
-        const allNotifs = [...localNotifs, ...serverNotifs];
+        // 2. جلب المشاريع الحقيقية لحساب العدد الفعلي ديناميكياً
+        if (companyId) {
+          try {
+            setLoadingProjects(true);
+            const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                "x-auth-token": token,
+                "Authorization": `Bearer ${token}`
+              },
+            });
+            
+            if (response.ok) {
+              const resData = await response.json();
+              const fetchedProjects = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
+              
+              // حساب المشاريع النشطة (اللي الـ progress بتاعها أقل من 100% أو حالتها active)
+              const activeCount = fetchedProjects.filter(p => (p.progress !== undefined ? p.progress < 100 : true)).length;
+              
+              setProjectStats({
+                total: fetchedProjects.length,
+                active: activeCount
+              });
+            }
+          } catch (err) {
+            console.error("Error fetching projects for KPI:", err);
+          } finally {
+            setLoadingProjects(false);
+          }
+        }
 
-        // تحويل البيانات وعرض أحدث 4 إشعارات فقط للحفاظ على ثبات الـ UI
-        const transformed = allNotifs
-          .map((notif) => {
-            const safeType = (notif.type || "system").toLowerCase();
-            return {
-              id: notif._id || notif.id,
-              title: notif.title || "No Title",
-              desc: notif.message || notif.desc || "",
-              style: typeStyle[safeType] || typeStyle.system,
-              time: notif.createdAt
-                ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : "Just Now",
-              rawCreatedAt: notif.createdAt,
-            };
-          })
-          // ترتيب تنازلي حسب التاريخ عشان نضمن إن الأحدث (أو الترحيب التلقائي) يظهر أول حاجة فوق
-          .sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt))
-          .slice(0, 4);
-
-        setNotifications(transformed);
       } catch (error) {
-        console.error("Dashboard notifications fetch error:", error);
-      } finally {
+        console.error("Dashboard init error:", error);
         setLoadingNotif(false);
+        setLoadingProjects(false);
       }
     };
 
-    fetchDashboardNotifications();
+    fetchDashboardData();
   }, [token]);
 
   const employees = [
@@ -124,29 +166,32 @@ export default function Dashboard() {
   const cardClass =
     "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
 
+  // تجميع الـ KPIs وربط حقل الـ Projects بالـ state الديناميكية الجديدة
+  const kpiItems = [
+    { icon: <FaProjectDiagram />, label: "Projects", value: loadingProjects ? "..." : String(projectStats.total), sub: `${projectStats.active} active` },
+    { icon: <FaTasks />, label: "Tasks", value: "84", sub: "18 pending" }, // يمكن ربطها لاحقاً بنفس طريقة المشاريع
+    { icon: <FaCalendarAlt />, label: "Meetings", value: "18", sub: "3 today" },
+    { icon: <FaUsers />, label: "Teams", value: "4", sub: "26 members" },
+  ];
+
   return (
     <MainLayout title="Dashboard">
       <div className="grid h-full min-h-0 grid-rows-[82px_1fr] gap-6 text-white">
         {/* KPI CARDS */}
         <div className="grid grid-cols-4 gap-5">
-          {[
-            [<FaProjectDiagram />, "Projects", "12", "4 active"],
-            [<FaTasks />, "Tasks", "84", "18 pending"],
-            [<FaCalendarAlt />, "Meetings", "18", "3 today"],
-            [<FaUsers />, "Teams", "4", "26 members"],
-          ].map((item) => (
+          {kpiItems.map((item) => (
             <div
-              key={item[1]}
+              key={item.label}
               className="flex items-center gap-4 rounded-[24px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 px-5 shadow-[0_16px_35px_rgba(0,0,0,.24)] transition hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(95,150,255,.18)]"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)]">
-                {item[0]}
+                {item.icon}
               </div>
 
               <div>
-                <p className="text-[11px] text-white/45">{item[1]}</p>
-                <h3 className="text-[20px] font-extrabold">{item[2]}</h3>
-                <p className="text-[10px] text-[#78aaff]">{item[3]}</p>
+                <p className="text-[11px] text-white/45">{item.label}</p>
+                <h3 className="text-[20px] font-extrabold">{item.value}</h3>
+                <p className="text-[10px] text-[#78aaff]">{item.sub}</p>
               </div>
             </div>
           ))}
@@ -220,7 +265,7 @@ export default function Dashboard() {
               ))}
 
               <div className="absolute inset-0 flex items-end justify-around pb-6">
-                {bars.map(([name, value], i) => (
+                {bars.map(([name, value]) => (
                   <div key={name} className="flex flex-col items-center">
                     <div className="relative flex h-[135px] w-[38px] items-end rounded-[14px] bg-white/10 p-[4px]">
                       <div
