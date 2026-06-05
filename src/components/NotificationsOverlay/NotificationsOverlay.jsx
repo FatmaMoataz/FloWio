@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { jwtDecode } from "jwt-decode";
+import notificationService from "../../services/notificationService";
 import {
   FaBell,
   FaCheckCircle,
@@ -8,97 +11,148 @@ import {
   FaLaptopCode,
 } from "react-icons/fa";
 
-const initialSections = [
-  {
-    title: "Today",
-    items: [
-      {
-        icon: <FaBell />,
-        title: "Upcoming Meeting",
-        desc: "Sprint Planning starts today at 3:00 PM",
-        time: "2 min ago",
-        unread: true,
-        path: "/meetings",
-      },
-      {
-        icon: <FaTasks />,
-        title: "Task Updated",
-        desc: "Ahmed updated UI Design Task",
-        time: "12 min ago",
-        unread: true,
-        path: "/projects",
-      },
-      {
-        icon: <FaCheckCircle />,
-        title: "Meeting Completed",
-        desc: "Meeting summary generated successfully",
-        time: "30 min ago",
-        unread: true,
-        path: "/summary",
-      },
-    ],
+// الألوان والأيقونات الديناميكية حسب النوع
+const typeStyle = {
+  system: {
+    icon: <FaBell />,
+    color: "from-[#6eb5ff] to-[#5b7dff]",
   },
-  {
-    title: "Yesterday",
-    items: [
-      {
-        icon: <FaUsers />,
-        title: "New Team Member",
-        desc: "Sarah joined Design Team",
-        time: "1 day ago",
-        unread: true,
-        path: "/teams",
-      },
-      {
-        icon: <FaLaptopCode />,
-        title: "Project Progress",
-        desc: "Flowio reached 80% completion",
-        time: "1 day ago",
-        unread: true,
-        path: "/dashboard",
-      },
-    ],
+  task_assigned: {
+    icon: <FaTasks />,
+    color: "from-[#ffb86b] to-[#ff7b54]",
   },
-];
+  task_updated: {
+    icon: <FaTasks />,
+    color: "from-[#ffb86b] to-[#ff7b54]",
+  },
+  comment: {
+    icon: <FaCheckCircle />,
+    color: "from-[#5fffd0] to-[#35b7ff]",
+  },
+  like: {
+    icon: <FaUsers />,
+    color: "from-[#ff5ea8] to-[#ff3d7f]",
+  },
+  mention: {
+    icon: <FaUsers />,
+    color: "from-[#ff5ea8] to-[#ff3d7f]",
+  },
+  polls: {
+    icon: <FaLaptopCode />,
+    color: "from-[#8f7cff] to-[#5b7dff]",
+  },
+};
+
+// دالة تقسيم التاريخ ديناميكياً
+const getNotificationSection = (dateString) => {
+  if (!dateString) return "Older";
+  const notifDate = new Date(dateString);
+  const today = new Date();
+  let yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (notifDate.toDateString() === today.toDateString()) {
+    return "Today";
+  } else if (notifDate.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  } else {
+    return "Older";
+  }
+};
 
 export default function NotificationsOverlay({ onClose }) {
   const navigate = useNavigate();
-  const [sections, setSections] = useState(initialSections);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const unreadCount = sections.reduce(
-    (total, section) =>
-      total + section.items.filter((item) => item.unread).length,
-    0
-  );
+  const token = localStorage.getItem("token");
 
-  const markAllAsRead = () => {
-    setSections((prev) =>
-      prev.map((section) => ({
-        ...section,
-        items: section.items.map((item) => ({
-          ...item,
-          unread: false,
-        })),
-      }))
-    );
+  // جلب الإشعارات من السيرفر
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        const decoded = jwtDecode(token);
+        const realUserId = decoded._id;
+
+        if (!realUserId) return;
+
+        const data = await notificationService.getUserNotifications(realUserId);
+
+        const transformed = (data.notifications || []).map((notif) => {
+          const safeType = (notif.type || "system").toLowerCase();
+          return {
+            id: notif._id,
+            title: notif.title || "No Title",
+            desc: notif.message || "",
+            type: typeStyle[safeType] ? safeType : "system",
+            read: notif.is_read || false,
+            time: notif.createdAt
+              ? new Date(notif.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "",
+            section: getNotificationSection(notif.createdAt),
+            path: notif.path || "/notifications", // الباث اللي هيروح عليه لو مبعوت من الـ backend
+          };
+        });
+
+        setNotifications(transformed);
+      } catch (error) {
+        console.error("Overlay fetch error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, [token]);
+
+  // حساب عدد غير المقروء ديناميكياً
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
+  // جعل كل الإشعارات مقروءة في السيرفر والـ UI
+  const markAllAsRead = async () => {
+    const unreadNotifications = notifications.filter((item) => !item.read);
+    if (unreadNotifications.length === 0) return;
+
+    try {
+      await Promise.all(
+        unreadNotifications.map((item) => notificationService.markAsRead(item.id))
+      );
+
+      setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+      toast.success("All notifications marked as read");
+    } catch (error) {
+      console.error("Mark all read error:", error);
+      toast.error("Failed to mark all as read");
+    }
   };
 
-  const openNotification = (sectionTitle, itemTitle, path) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.title === sectionTitle
-          ? {
-              ...section,
-              items: section.items.map((item) =>
-                item.title === itemTitle ? { ...item, unread: false } : item
-              ),
-            }
-          : section
-      )
-    );
+  // فتح إشعار معين وتحديث حالته ومغادرة الـ Overlay
+  const openNotification = async (id, path) => {
+    try {
+      await notificationService.markAsRead(id);
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, read: true } : item))
+      );
+    } catch (error) {
+      console.error("Mark as read error:", error);
+    }
 
     onClose?.();
     navigate(path);
+  };
+
+  // تجميع الإشعارات بناءً على الـ section المحسوب ديناميكياً
+  const sectionsToRender = ["Today", "Yesterday", "Older"];
+  const grouped = {
+    Today: notifications.filter((item) => item.section === "Today"),
+    Yesterday: notifications.filter((item) => item.section === "Yesterday"),
+    Older: notifications.filter((item) => item.section === "Older"),
   };
 
   return (
@@ -106,9 +160,7 @@ export default function NotificationsOverlay({ onClose }) {
       <div className="border-b border-white/5 p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-[20px] font-bold text-white">
-              Notifications
-            </h3>
+            <h3 className="text-[20px] font-bold text-white">Notifications</h3>
             <p className="mt-1 text-[11px] text-white/45">
               Stay updated with your workspace
             </p>
@@ -130,61 +182,82 @@ export default function NotificationsOverlay({ onClose }) {
             </span>
           )}
 
-          <button
-            onClick={markAllAsRead}
-            className="text-[11px] font-semibold text-cyan-300 transition hover:text-cyan-100"
-          >
-            Mark all as read
-          </button>
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="text-[11px] font-semibold text-cyan-300 transition hover:text-cyan-100"
+            >
+              Mark all as read
+            </button>
+          )}
         </div>
       </div>
 
       <div className="max-h-[430px] overflow-y-auto p-5">
-        {sections.map((section) => (
-          <div key={section.title} className="mb-8">
-            <h4 className="mb-4 text-[11px] font-bold uppercase tracking-[2px] text-white/35">
-              {section.title}
-            </h4>
-
-            <div className="space-y-3">
-              {section.items.map((item) => (
-                <button
-                  key={item.title}
-                  onClick={() =>
-                    openNotification(section.title, item.title, item.path)
-                  }
-                  className="group w-full rounded-[20px] border border-white/5 bg-[#10184c]/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-[#151f62] hover:shadow-[0_0_20px_rgba(95,150,255,.15)]"
-                >
-                  <div className="flex gap-4">
-                    <div className="relative flex h-11 w-11 min-w-[44px] items-center justify-center rounded-full bg-gradient-to-r from-[#69b5ff] to-[#6178ff] text-white shadow-[0_0_15px_rgba(95,150,255,.25)]">
-                      {item.icon}
-
-                      {item.unread && (
-                        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#10184c] bg-[#5fffd0]" />
-                      )}
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <h5 className="text-[13px] font-bold text-white">
-                          {item.title}
-                        </h5>
-
-                        <span className="text-[10px] text-white/40">
-                          {item.time}
-                        </span>
-                      </div>
-
-                      <p className="mt-2 text-[11px] leading-relaxed text-white/55">
-                        {item.desc}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+        {loading ? (
+          <div className="py-8 text-center text-xs text-white/40">
+            Loading notifications...
           </div>
-        ))}
+        ) : notifications.length === 0 ? (
+          <div className="py-8 text-center text-xs text-white/35">
+            No notifications found.
+          </div>
+        ) : (
+          sectionsToRender.map((section) => {
+            const sectionItems = grouped[section] || [];
+            if (sectionItems.length === 0) return null;
+
+            return (
+              <div key={section} className="mb-6 last:mb-0">
+                <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[2px] text-white/35">
+                  {section}
+                </h4>
+
+                <div className="space-y-3">
+                  {sectionItems.map((item) => {
+                    const style = typeStyle[item.type] || typeStyle.system;
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => openNotification(item.id, item.path)}
+                        className="group w-full rounded-[20px] border border-white/5 bg-[#10184c]/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-[#151f62] hover:shadow-[0_0_20px_rgba(95,150,255,.15)]"
+                      >
+                        <div className="flex gap-4">
+                          <div
+                            className={`relative flex h-11 w-11 min-w-[44px] items-center justify-center rounded-full bg-gradient-to-b ${style.color} text-white shadow-[0_0_15px_rgba(95,150,255,.25)]`}
+                          >
+                            {style.icon}
+
+                            {!item.read && (
+                              <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#10184c] bg-[#5fffd0]" />
+                            )}
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <h5 className="text-[13px] font-bold text-white">
+                                {item.title}
+                              </h5>
+
+                              <span className="text-[10px] text-white/40">
+                                {item.time}
+                              </span>
+                            </div>
+
+                            <p className="mt-2 text-[11px] leading-relaxed text-white/55">
+                              {item.desc}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="border-t border-white/5 p-5">

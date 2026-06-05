@@ -48,6 +48,10 @@ export default function Login() {
         localStorage.setItem("token", response.data.token);
       }
 
+      if (response.data.data?._id) {
+        localStorage.setItem("userId", response.data.data._id);
+      }
+
       toast.success("Login successful!");
       navigate("/dashboard");
     } catch (error) {

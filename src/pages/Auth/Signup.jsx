@@ -100,6 +100,10 @@ export default function Signup() {
         localStorage.setItem("token", response.data.token);
       }
 
+      if (response.data._id) {
+        localStorage.setItem("userId", response.data._id);
+      }
+
       toast.success("Account created successfully!");
       navigate("/dashboard");
     } catch (error) {
@@ -127,6 +131,10 @@ export default function Signup() {
 
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
+      }
+
+      if (response.data._id) {
+        localStorage.setItem("userId", response.data._id);
       }
 
       setShowGooglePopup(false);

@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
+import { jwtDecode } from "jwt-decode"; // استيراد فك التشفير
 
 import {
   FaLaptopCode,
@@ -18,6 +20,37 @@ import {
 } from "react-icons/fa";
 
 export default function Profile() {
+  // 1. أضفنا الـ avatar هنا وخلينا القيمة المبدئية صورة placeholder أو فاضية
+  const [userData, setUserData] = useState({ 
+    name: "Loading...", 
+    email: "...", 
+    avatar: "" 
+  });
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        console.log("Decoded Token:", decoded); // عشان تتأكد من المسميات اللي راجعة من السيرفر عندك
+
+        // 2. سحب البيانات والـ avatar (غالباً بيكون اسمه picture أو avatar أو imageUrl في الـ Google payload)
+        setUserData({
+          name: decoded.name || decoded.username || decoded.email?.split('@')[0] || "User",
+          email: decoded.email || "No Email Provided",
+          avatar: decoded.picture || decoded.avatar || decoded.imageUrl || "" 
+        });
+      } catch (error) {
+        console.error("Error decoding token in profile:", error);
+        setUserData({ 
+          name: "Guest User", 
+          email: "guest@workspace.com", 
+          avatar: "" 
+        });
+      }
+    }
+  }, []);
+
   const projects = [
     {
       icon: <FaLaptopCode />,
@@ -64,70 +97,62 @@ export default function Profile() {
   return (
     <MainLayout title="Profile">
       <div className="grid h-full min-h-0 grid-cols-[1fr_300px] gap-6 text-white">
-<div className="grid min-h-0 grid-rows-[280px_1fr] gap-6 overflow-hidden">
-  
-           {/* PROJECTS */}
-<div className={`${card} p-5`}>
-  <div className="mb-4 flex items-center justify-between">
-    <h3 className="text-[17px] font-bold">Projects In Progress</h3>
-
-    <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[10px] font-bold text-[#78aaff]">
-      2 Active
-    </span>
-  </div>
-
-  <div className="grid h-[calc(100%-38px)] grid-cols-2 gap-5">
-    {projects.map((project) => (
-      <Link
-        to="/projects"
-        key={project.title}
-        className="group flex flex-col justify-between rounded-[24px] border border-white/5 bg-[#10184c]/90 p-4 transition-all duration-300 hover:-translate-y-1 hover:bg-[#151f62] hover:shadow-[0_0_25px_rgba(95,150,255,.22)]"
-      >
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-[14px] bg-gradient-to-b ${project.color}`}
-            >
-              {project.icon}
+        <div className="grid min-h-0 grid-rows-[280px_1fr] gap-6 overflow-hidden">
+          
+          {/* PROJECTS */}
+          <div className={`${card} p-5`}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[17px] font-bold">Projects In Progress</h3>
+              <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[10px] font-bold text-[#78aaff]">
+                2 Active
+              </span>
             </div>
 
-            <span className="text-[13px] font-extrabold">
-              {project.progress}%
-            </span>
+            <div className="grid h-[calc(100%-38px)] grid-cols-2 gap-5">
+              {projects.map((project) => (
+                <Link
+                  to="/projects"
+                  key={project.title}
+                  className="group flex flex-col justify-between rounded-[24px] border border-white/5 bg-[#10184c]/90 p-4 transition-all duration-300 hover:-translate-y-1 hover:bg-[#151f62] hover:shadow-[0_0_25px_rgba(95,150,255,.22)]"
+                >
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-[14px] bg-gradient-to-b ${project.color}`}
+                      >
+                        {project.icon}
+                      </div>
+                      <span className="text-[13px] font-extrabold">
+                        {project.progress}%
+                      </span>
+                    </div>
+                    <h4 className="text-[15px] font-bold">{project.title}</h4>
+                    <p className="mt-2 text-[11px] leading-relaxed text-white/55">
+                      {project.desc}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="mt-4 h-[7px] rounded-full bg-white/10">
+                      <div
+                        className={`h-full rounded-full bg-gradient-to-r ${project.color}`}
+                        style={{ width: `${project.progress}%` }}
+                      />
+                    </div>
+                    <div className="mt-3 flex justify-between text-[10px] text-white/50">
+                      <span>{project.date}</span>
+                      <span>{project.tasks}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-
-          <h4 className="text-[15px] font-bold">
-            {project.title}
-          </h4>
-
-          <p className="mt-2 text-[11px] leading-relaxed text-white/55">
-            {project.desc}
-          </p>
-        </div>
-
-        <div>
-          <div className="mt-4 h-[7px] rounded-full bg-white/10">
-            <div
-              className={`h-full rounded-full bg-gradient-to-r ${project.color}`}
-              style={{ width: `${project.progress}%` }}
-            />
-          </div>
-
-          <div className="mt-3 flex justify-between text-[10px] text-white/50">
-            <span>{project.date}</span>
-            <span>{project.tasks}</span>
-          </div>
-        </div>
-      </Link>
-    ))}
-  </div>
-</div>
 
           {/* RECENT ACTIVITY */}
           <div className={`${card} min-h-0 p-5`}>
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-[17px] font-bold">Recent Activity</h3>
-
               <Link
                 to="/recent-activity"
                 className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 transition hover:text-cyan-100"
@@ -150,7 +175,6 @@ export default function Profile() {
 
                   <div>
                     <h4 className="text-[12px] font-bold">{a[0]}</h4>
-
                     <p className="mt-1 flex items-center gap-2 text-[10px] text-white/45">
                       <FaClock /> 25/6/2023
                     </p>
@@ -172,24 +196,34 @@ export default function Profile() {
         <div className={`${card} flex min-h-0 flex-col p-5`}>
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[16px] font-bold">Your Profile</h3>
-
             <button className="text-white/45 transition hover:text-white">
               <FaEllipsisV />
             </button>
           </div>
 
-          <div className="mx-auto h-[86px] w-[86px] overflow-hidden rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] p-[3px] shadow-[0_0_25px_rgba(95,150,255,.35)]">
-            <img
-              src="https://i.pravatar.cc/100?img=8"
-              alt="Omar"
-              className="h-full w-full rounded-full object-cover"
-            />
+          {/* 3. تعديل عرض الـ Avatar: لو موجود يعرض الصورة، لو مش موجود يعمل الحرف الأول من اسمه داخل دائرة جرافيكس شكلها شيك */}
+          <div className="mx-auto flex h-[86px] w-[86px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] p-[3px] shadow-[0_0_25px_rgba(95,150,255,.35)]">
+            {userData.avatar ? (
+              <img
+                src={userData.avatar}
+                alt={userData.name}
+                className="h-full w-full rounded-full object-cover"
+                referrerPolicy="no-referrer" // مهم جداً عشان صور جوجل تفتح بدون مشاكل 403
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#10184c] text-[26px] font-black uppercase text-cyan-300">
+                {userData.name.charAt(0)}
+              </div>
+            )}
           </div>
 
-          <h2 className="mt-3 text-center text-[20px] font-extrabold">Omar</h2>
+          {/* عرض الاسم والإيميل الحقيقيين هنا */}
+          <h2 className="mt-3 text-center text-[20px] font-extrabold capitalize">
+            {userData.name}
+          </h2>
 
-          <p className="mb-5 text-center text-[12px] text-white/50">
-            omar@gmail.com
+          <p className="mb-5 text-center text-[12px] text-white/50 break-all">
+            {userData.email}
           </p>
 
           <div className="mb-5 grid grid-cols-3 gap-2">
@@ -216,7 +250,6 @@ export default function Profile() {
               <div key={team.name} className="mb-5">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-[12px] font-bold">{team.name}</span>
-
                   <Link
                     to="/teams"
                     className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-white/5 text-[9px] text-white/70 hover:text-white"
@@ -238,7 +271,6 @@ export default function Profile() {
                           alt={member}
                           className="h-9 w-9 rounded-full object-cover ring-2 ring-white/10"
                         />
-
                         <span className="text-[12px] font-medium text-white">
                           {member}
                         </span>

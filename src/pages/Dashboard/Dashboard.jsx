@@ -1,5 +1,8 @@
+import { useState, useEffect } from "react";
 import MainLayout from "../../layout/MainLayout";
 import { Link } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
+import notificationService from "../../services/notificationService";
 
 import {
   FaProjectDiagram,
@@ -7,13 +10,69 @@ import {
   FaUsers,
   FaCalendarAlt,
   FaCheckCircle,
-  FaClock,
   FaBell,
   FaArrowRight,
   FaChartBar,
 } from "react-icons/fa";
 
+// خريطة لتحديد الأيقونات والألوان بناءً على الـ type القادم من الـ API
+const typeStyle = {
+  system: { icon: <FaBell />, color: "bg-cyan-400/20 text-cyan-300" },
+  task_assigned: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
+  task_updated: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
+  comment: { icon: <FaCheckCircle />, color: "bg-emerald-400/20 text-emerald-300" },
+  like: { icon: <FaUsers />, color: "bg-cyan-400/20 text-cyan-300" },
+  mention: { icon: <FaUsers />, color: "bg-purple-400/20 text-purple-300" },
+  polls: { icon: <FaProjectDiagram />, color: "bg-emerald-400/20 text-emerald-300" },
+};
+
 export default function Dashboard() {
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotif, setLoadingNotif] = useState(true);
+
+  const token = localStorage.getItem("token");
+
+  // جلب الإشعارات من الـ API لقسم الـ Dashboard
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchDashboardNotifications = async () => {
+      try {
+        setLoadingNotif(true);
+        const decoded = jwtDecode(token);
+        const realUserId = decoded._id;
+
+        if (!realUserId) return;
+
+        const data = await notificationService.getUserNotifications(realUserId);
+        
+        // تحويل البيانات وعرض أحدث 4 إشعارات فقط
+        const transformed = (data.notifications || [])
+          .map((notif) => {
+            const safeType = (notif.type || "system").toLowerCase();
+            return {
+              id: notif._id,
+              title: notif.title || "No Title",
+              desc: notif.message || "",
+              style: typeStyle[safeType] || typeStyle.system,
+              time: notif.createdAt 
+                ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                : "",
+            };
+          })
+          .slice(0, 4); // تحديد العدد بـ 4 فقط للحفاظ على الـ UI ثابت
+
+        setNotifications(transformed);
+      } catch (error) {
+        console.error("Dashboard notifications fetch error:", error);
+      } finally {
+        setLoadingNotif(false);
+      }
+    };
+
+    fetchDashboardNotifications();
+  }, [token]);
+
   const employees = [
     {
       name: "Justin Lipshutz",
@@ -46,13 +105,6 @@ export default function Dashboard() {
     ["Task 2", 70],
     ["Task 3", 92],
     ["Task 4", 38],
-  ];
-
-  const notifications = [
-    ["Upcoming Meeting", "Sprint Planning starts today at 3:00 PM", "2 min ago", <FaClock />],
-    ["Task Updated", "Ahmed updated UI Design Task", "10 min ago", <FaCheckCircle />],
-    ["Summary Generated", "Meeting 1 summary is ready", "1 hour ago", <FaCheckCircle />],
-    ["New Team Member", "Sara joined Design Team", "Yesterday", <FaUsers />],
   ];
 
   const cardClass =
@@ -227,7 +279,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* NOTIFICATIONS */}
+          {/* DYNAMIC NOTIFICATIONS */}
           <div className={`${cardClass} flex flex-col`}>
             <div className="mb-5 flex shrink-0 items-center justify-between">
               <div className="flex items-center gap-3">
@@ -247,33 +299,37 @@ export default function Dashboard() {
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
-              {notifications.map((item, index) => (
-                <div
-                  key={item[0]}
-                  className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]"
-                >
-                  <div
-                    className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                      index === 0
-                        ? "bg-cyan-400/20 text-cyan-300"
-                        : index === 1
-                        ? "bg-purple-400/20 text-purple-300"
-                        : "bg-emerald-400/20 text-emerald-300"
-                    }`}
-                  >
-                    {item[3]}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-[13px] font-bold">{item[0]}</h4>
-                    <p className="mt-1 text-[11px] leading-relaxed text-white/55">
-                      {item[1]}
-                    </p>
-                  </div>
-
-                  <span className="text-[10px] text-white/35">{item[2]}</span>
+              {loadingNotif ? (
+                <div className="text-center text-xs text-white/35 py-8">
+                  Loading notifications...
                 </div>
-              ))}
+              ) : notifications.length === 0 ? (
+                <div className="text-center text-xs text-white/25 py-8">
+                  No notifications found.
+                </div>
+              ) : (
+                notifications.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]"
+                  >
+                    <div
+                      className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.style.color}`}
+                    >
+                      {item.style.icon}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-[13px] font-bold truncate">{item.title}</h4>
+                      <p className="mt-1 text-[11px] leading-relaxed text-white/55 line-clamp-2">
+                        {item.desc}
+                      </p>
+                    </div>
+
+                    <span className="text-[10px] text-white/35 whitespace-nowrap">{item.time}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
