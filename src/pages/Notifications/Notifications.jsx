@@ -15,6 +15,7 @@ import {
   FaEye,
   FaCheck,
   FaRocket,
+  FaChevronDown,
 } from "react-icons/fa";
 
 const typeStyle = {
@@ -46,6 +47,7 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState([]);
 
   const token = localStorage.getItem("token");
@@ -234,15 +236,87 @@ export default function Notifications() {
                 Select All
               </button>
 
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="h-10 rounded-full border border-blue-300/10 bg-[#141d66] px-4 text-xs font-bold text-white outline-none"
-              >
-                <option value="All">All</option>
-                <option value="Unread">Unread</option>
-                <option value="Read">Read</option>
-              </select>
+              <div className="relative">
+  <button
+    onClick={() => setFilterOpen(!filterOpen)}
+    className="
+      flex
+      h-10
+      min-w-[110px]
+      items-center
+      justify-between
+      gap-3
+      rounded-full
+      border
+      border-blue-300/10
+      bg-[#141d66]/95
+      px-4
+      text-xs
+      font-bold
+      text-white
+      shadow-[0_10px_25px_rgba(0,0,0,.18)]
+      transition
+      hover:border-[#6eb5ff]/40
+    "
+  >
+    {filter}
+
+    <FaChevronDown
+      className={`text-[10px] text-white/55 transition duration-300 ${
+        filterOpen ? "rotate-180" : ""
+      }`}
+    />
+  </button>
+
+  {filterOpen && (
+    <div
+      className="
+        absolute
+        right-0
+        top-12
+        z-50
+        w-[140px]
+        rounded-[18px]
+        border
+        border-blue-300/10
+        bg-[#0d1448]
+        p-2
+        shadow-[0_20px_45px_rgba(0,0,0,.45)]
+      "
+    >
+      {["All", "Unread", "Read"].map((item) => (
+        <button
+          key={item}
+          onClick={() => {
+            setFilter(item);
+            setFilterOpen(false);
+          }}
+          className={`
+            mb-1
+            flex
+            h-10
+            w-full
+            items-center
+            rounded-[12px]
+            px-3
+            text-left
+            text-xs
+            font-semibold
+            transition
+            last:mb-0
+            ${
+              filter === item
+                ? "bg-blue-400/15 text-[#78aaff]"
+                : "text-white/70 hover:bg-blue-300/10 hover:text-white"
+            }
+          `}
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
             </div>
           </div>
 

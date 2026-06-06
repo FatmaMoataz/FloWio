@@ -1,2 +1,12 @@
 import MainLayout from "../../layout/MainLayout";
-export default function Settings(){return <MainLayout title="Settings"><div className="rounded-[24px] bg-[#111b63]/95 p-8 text-white"><h2 className="text-2xl font-bold">Settings</h2><p className="mt-3 text-white/65">Account, security and preferences.</p></div></MainLayout>}
+import SettingsTabs from "./components/SettingsTabs";
+
+export default function Settings() {
+  return (
+    <MainLayout title="Settings">
+      <div className="h-full rounded-[28px] border border-blue-300/10 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 p-7 text-white shadow-[0_22px_55px_rgba(0,0,0,.30)]">
+        <SettingsTabs />
+      </div>
+    </MainLayout>
+  );
+}
