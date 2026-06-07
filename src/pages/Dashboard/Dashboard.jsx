@@ -37,6 +37,23 @@ export default function Dashboard() {
   const [teamStats, setTeamStats] = useState({ total: 0, membersCount: 0 });
   const [loadingTeams, setLoadingTeams] = useState(true);
 
+  const [taskStats, setTaskStats] = useState({ total: 0, pending: 0 });
+  const [loadingTasks, setLoadingTasks] = useState(true);
+
+  const [meetingStats, setMeetingStats] = useState({ total: 0, today: 0 });
+  const [loadingMeetings, setLoadingMeetings] = useState(true);
+
+  const [taskBarData, setTaskBarData] = useState([
+    ["Task 1", 0], ["Task 2", 0], ["Task 3", 0], ["Task 4", 0]
+  ]);
+
+  // الـ State الجديدة لحساب نسب المشاريع/التأسكات بشكل ديناميكي للـ Donut Chart 📊
+  const [projectProgressStats, setProjectProgressStats] = useState({
+    donePercent: 50,
+    inProgressPercent: 30,
+    toDoPercent: 20
+  });
+
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -47,7 +64,9 @@ export default function Dashboard() {
         const decoded = jwtDecode(token);
         const realUserId = decoded._id;
         
-        let companyId = decoded.companyId || decoded.company || localStorage.getItem("companyId");
+        // تأمين قراءة الـ companyId بأي شكل راجعة بيه من الـ Token
+        let companyId = decoded.companyId || decoded.company || (decoded.user && decoded.user.companyId) || localStorage.getItem("companyId");
+        
         if (!companyId && decoded.role === "system-admin") {
           companyId = "66391d5bb96fa3ef34a8145b";
           localStorage.setItem("companyId", companyId);
@@ -96,9 +115,11 @@ export default function Dashboard() {
           }
         }
 
-        // 2. جلب المشاريع الحقيقية
+        // 2. جلب المشاريع الحقيقية والتأسكات والميتنجز التابعة لها
         if (companyId) {
           setLoadingProjects(true);
+          setLoadingTasks(true);
+          setLoadingMeetings(true);
           try {
             const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
               method: "GET",
@@ -114,15 +135,108 @@ export default function Dashboard() {
                 total: fetchedProjects.length,
                 active: activeCount
               });
+
+              if (fetchedProjects.length > 0) {
+                let allTasks = [];
+                let allMeetings = [];
+
+                await Promise.all(
+                  fetchedProjects.map(async (project) => {
+                    const pId = project._id || project.id;
+                    
+                    // جلب الـ Tasks لكل مشروع
+                    try {
+                      const tasksResp = await fetch(`https://flowio-backend.vercel.app/api/projects/${pId}/tasks`, {
+                        method: "GET",
+                        headers: headers,
+                      });
+                      if (tasksResp.ok) {
+                        const tData = await tasksResp.json();
+                        const tArray = tData.data || (Array.isArray(tData) ? tData : []);
+                        allTasks = [...allTasks, ...tArray];
+                      }
+                    } catch (err) { 
+                      console.error(`Error fetching tasks for project ${pId}:`, err); 
+                    }
+
+                    // جلب الـ Meetings لكل مشروع
+                    try {
+                      const meetingsResp = await fetch(`https://flowio-backend.vercel.app/api/meetings/project/${pId}`, {
+                        method: "GET",
+                        headers: headers,
+                      });
+                      if (meetingsResp.ok) {
+                        const mData = await meetingsResp.json();
+                        const mArray = mData.data || (Array.isArray(mData) ? mData : []);
+                        allMeetings = [...allMeetings, ...mArray];
+                      }
+                    } catch (err) { 
+                      console.error(`Error fetching meetings for project ${pId}:`, err); 
+                    }
+                  })
+                );
+
+                // حساب إحصائيات الـ Tasks بشكل حقيقي ومرن
+                const totalTasksCount = allTasks.length;
+                const pendingTasks = allTasks.filter(t => {
+                  const status = (t.status || "").toLowerCase();
+                  return status !== "completed" && status !== "done";
+                }).length;
+                
+                setTaskStats({ total: totalTasksCount, pending: pendingTasks });
+
+                // حساب التوزيع الحقيقي للـ Donut Chart من واقع التأسكات المجلوبة 🌟
+                if (totalTasksCount > 0) {
+                  const doneCount = allTasks.filter(t => ["completed", "done"].includes((t.status || "").toLowerCase())).length;
+                  const inProgressCount = allTasks.filter(t => ["in progress", "in_progress", "doing"].includes((t.status || "").toLowerCase())).length;
+                  const toDoCount = totalTasksCount - (doneCount + inProgressCount);
+
+                  setProjectProgressStats({
+                    donePercent: Math.round((doneCount / totalTasksCount) * 100),
+                    inProgressPercent: Math.round((inProgressCount / totalTasksCount) * 100),
+                    toDoPercent: Math.round((toDoCount / totalTasksCount) * 100)
+                  });
+                }
+
+                // ربط الـ Bar Chart ببيانات حقيقية من التأسكات
+                if (allTasks.length > 0) {
+                  const chartSlice = allTasks.slice(0, 4).map((t) => {
+                    const title = t.title || "Task";
+                    const status = (t.status || "").toLowerCase();
+                    return [
+                      title.length > 8 ? title.substring(0, 8) + ".." : title, 
+                      t.progress || (["done", "completed"].includes(status) ? 100 : 40)
+                    ];
+                  });
+                  
+                  while(chartSlice.length < 4) {
+                    chartSlice.push([`Task ${chartSlice.length + 1}`, 0]);
+                  }
+                  setTaskBarData(chartSlice);
+                }
+
+                // حساب إحصائيات الـ Meetings انهارده
+                const todayStr = new Date().toISOString().split('T')[0];
+                const meetingsToday = allMeetings.filter(m => m.date && m.date.startsWith(todayStr)).length;
+                setMeetingStats({ total: allMeetings.length, today: meetingsToday });
+
+              } else {
+                // Fallback لو مفيش داتا خالص عشان الشكل الجمالي للموقع في أول تسجيل
+                setTaskStats({ total: 0, pending: 0 });
+                setMeetingStats({ total: 0, today: 0 });
+                setProjectProgressStats({ donePercent: 0, inProgressPercent: 0, toDoPercent: 0 });
+              }
             }
           } catch (err) {
-            console.error("Error fetching projects for KPI:", err);
+            console.error("Error fetching projects/tasks/meetings KPI:", err);
           } finally {
             setLoadingProjects(false);
+            setLoadingTasks(false);
+            setLoadingMeetings(false);
           }
         }
 
-        // 3. جلب الفرق الحقيقية والأعضاء بالتوازي
+        // 3. جلب الفرق الحقيقية والأعضاء
         if (companyId) {
           setLoadingTeams(true);
           try {
@@ -176,11 +290,7 @@ export default function Dashboard() {
                   membersCount: allMembersIds.size
                 });
               } else {
-                // داتا احتياطية (Fallback) لو الـ Database فاضية تماماً للشركة دي عشان الـ UI ينطق ويظهر بيانات
-                setTeamStats({
-                  total: 3, 
-                  membersCount: 14
-                });
+                setTeamStats({ total: 0, membersCount: 1 }); // الـ Admin نفسه
               }
             }
           } catch (err) {
@@ -195,6 +305,8 @@ export default function Dashboard() {
         setLoadingNotif(false);
         setLoadingProjects(false);
         setLoadingTeams(false);
+        setLoadingTasks(false);
+        setLoadingMeetings(false);
       }
     };
 
@@ -208,22 +320,19 @@ export default function Dashboard() {
     { name: "Ahmed Mohamed", role: "Backend Developer", percent: 88, img: "https://i.pravatar.cc/60?img=22" },
   ];
 
-  const bars = [
-    ["Task 1", 100],
-    ["Task 2", 70],
-    ["Task 3", 92],
-    ["Task 4", 38],
-  ];
-
   const cardClass =
     "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
 
   const kpiItems = [
     { icon: <FaProjectDiagram />, label: "Projects", value: loadingProjects ? "..." : String(projectStats.total), sub: `${projectStats.active} active` },
-    { icon: <FaTasks />, label: "Tasks", value: "84", sub: "18 pending" }, 
-    { icon: <FaCalendarAlt />, label: "Meetings", value: "18", sub: "3 today" },
+    { icon: <FaTasks />, label: "Tasks", value: loadingTasks ? "..." : String(taskStats.total), sub: `${taskStats.pending} pending` }, 
+    { icon: <FaCalendarAlt />, label: "Meetings", value: loadingMeetings ? "..." : String(meetingStats.total), sub: `${meetingStats.today} today` },
     { icon: <FaUsers />, label: "Teams", value: loadingTeams ? "..." : String(teamStats.total), sub: `${teamStats.membersCount} members` },
   ];
+
+  // حساب درجات زوايا الـ Conic Gradient ديناميكياً للـ Donut Chart 💥
+  const doneDeg = (projectProgressStats.donePercent / 100) * 360;
+  const inProgressDeg = doneDeg + (projectProgressStats.inProgressPercent / 100) * 360;
 
   return (
     <MainLayout title="Dashboard">
@@ -260,20 +369,26 @@ export default function Dashboard() {
             </div>
 
             <div className="grid h-[calc(100%-44px)] grid-cols-[190px_1fr] items-center gap-7">
-              <div className="relative mx-auto h-[175px] w-[175px] rounded-full bg-[conic-gradient(#7b5dff_0deg_180deg,#07103a_180deg_186deg,#59d3ff_186deg_258deg,#07103a_258deg_264deg,#d86bff_264deg_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)]">
+              {/* تعديل الـ inline style ليقبل الزوايا الديناميكية المحسوبة فوق 🚀 */}
+              <div 
+                className="relative mx-auto h-[175px] w-[175px] rounded-full shadow-[0_0_38px_rgba(120,90,255,.30)] transition-all duration-500"
+                style={{
+                  background: `conic-gradient(#7b5dff 0deg ${doneDeg}deg, #07103a ${doneDeg}deg ${doneDeg + 4}deg, #d86bff ${doneDeg + 4}deg ${inProgressDeg}deg, #07103a ${inProgressDeg}deg ${inProgressDeg + 4}deg, #59d3ff ${inProgressDeg + 4}deg 360deg)`
+                }}
+              >
                 <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[34px] font-extrabold">50%</span>
+                  <span className="text-[34px] font-extrabold">{projectProgressStats.donePercent}%</span>
                   <span className="text-[11px] text-white/65">Completed</span>
                 </div>
               </div>
 
               <div className="space-y-4">
                 {[
-                  ["Done", "50%", "#7b5dff"],
-                  ["In Progress", "30%", "#d86bff"],
-                  ["To Do", "20%", "#59d3ff"],
+                  ["Done", `${projectProgressStats.donePercent}%`, "#7b5dff"],
+                  ["In Progress", `${projectProgressStats.inProgressPercent}%`, "#d86bff"],
+                  ["To Do", `${projectProgressStats.toDoPercent}%`, "#59d3ff"],
                 ].map(([label, value, color]) => (
                   <div key={label}>
                     <div className="mb-2 flex items-center justify-between text-[12px]">
@@ -289,7 +404,7 @@ export default function Dashboard() {
 
                     <div className="h-[6px] rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full"
+                        className="h-full rounded-full transition-all duration-500"
                         style={{ width: value, backgroundColor: color }}
                       />
                     </div>
@@ -316,16 +431,16 @@ export default function Dashboard() {
               ))}
 
               <div className="absolute inset-0 flex items-end justify-around pb-6">
-                {bars.map(([name, value]) => (
+                {taskBarData.map(([name, value]) => (
                   <div key={name} className="flex flex-col items-center">
                     <div className="relative flex h-[135px] w-[38px] items-end rounded-[14px] bg-white/10 p-[4px]">
                       <div
                         style={{ height: `${value}%` }}
-                        className="w-full rounded-[10px] bg-gradient-to-t from-[#6eb5ff] to-[#5b7dff] shadow-[0_0_20px_rgba(95,150,255,.35)]"
+                        className="w-full rounded-[10px] bg-gradient-to-t from-[#6eb5ff] to-[#5b7dff] shadow-[0_0_20px_rgba(95,150,255,.35)] transition-all duration-500"
                       />
                     </div>
 
-                    <span className="mt-2 text-[10px] text-white/75">
+                    <span className="mt-2 text-[10px] text-white/75 text-center max-w-[50px] truncate">
                       {name}
                     </span>
 

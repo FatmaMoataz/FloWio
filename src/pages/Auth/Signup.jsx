@@ -58,7 +58,7 @@ export default function Signup() {
   const inputClass =
     "w-full bg-transparent outline-none text-sm text-white placeholder:text-white/35";
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (
@@ -79,20 +79,24 @@ export default function Signup() {
     try {
       setLoading(true);
 
+      // الـ Payload المبعوث للباك إند تم تعديله هنا 👇
       const response = await axios.post(`${BACKEND_URL}/api/auth/signup`, {
-        fullName: form.fullName,
+        name: form.fullName, // 🌟 هنا حولناها لـ name عشان تطابق الـ Joi validation بالباك إند
         email: form.email,
         password: form.password,
         company: form.company,
         role: form.role,
       });
 
-      if (response.data.token) {
+      // تعديل قراءة التوكن والـ userId بناءً على هيكل الـ response.data الجديد
+      if (response.data?.data?.accessToken) {
+        localStorage.setItem("token", response.data.data.accessToken);
+      } else if (response.data?.token) {
         localStorage.setItem("token", response.data.token);
       }
 
-      if (response.data._id) {
-        localStorage.setItem("userId", response.data._id);
+      if (response.data?.data?.user?._id) {
+        localStorage.setItem("userId", response.data.data.user._id);
       }
 
       toast.success("Account created successfully!");
