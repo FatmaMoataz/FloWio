@@ -164,7 +164,7 @@ export default function Dashboard() {
   ];
 
   const cardClass =
-    "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
+    "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-5 xl:p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
 
   // تجميع الـ KPIs وربط حقل الـ Projects بالـ state الديناميكية الجديدة
   const kpiItems = [
@@ -176,13 +176,13 @@ export default function Dashboard() {
 
   return (
     <MainLayout title="Dashboard">
-      <div className="grid h-full min-h-0 grid-rows-[82px_1fr] gap-6 text-white">
+      <div className="grid h-full min-h-0 grid-rows-[clamp(78px,10vh,92px)_minmax(0,1fr)] gap-5 xl:gap-6 text-white">
         {/* KPI CARDS */}
         <div className="grid grid-cols-4 gap-5">
           {kpiItems.map((item) => (
             <div
               key={item.label}
-              className="flex items-center gap-4 rounded-[24px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 px-5 shadow-[0_16px_35px_rgba(0,0,0,.24)] transition hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(95,150,255,.18)]"
+              className="flex min-h-0 items-center gap-4 rounded-[24px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 px-5 shadow-[0_16px_35px_rgba(0,0,0,.24)] transition hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(95,150,255,.18)]"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)]">
                 {item.icon}
@@ -198,7 +198,7 @@ export default function Dashboard() {
         </div>
 
         {/* MAIN GRID */}
-        <div className="grid min-h-0 grid-cols-2 grid-rows-2 gap-6">
+        <div className="grid min-h-0 grid-cols-2 grid-rows-[minmax(250px,0.95fr)_minmax(250px,1fr)] gap-5 xl:gap-6">
           {/* PROJECT PROGRESS */}
           <div className={cardClass}>
             <div className="mb-4 flex items-center justify-between">
@@ -208,12 +208,12 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <div className="grid h-[calc(100%-44px)] grid-cols-[190px_1fr] items-center gap-7">
-              <div className="relative mx-auto h-[175px] w-[175px] rounded-full bg-[conic-gradient(#7b5dff_0deg_180deg,#07103a_180deg_186deg,#59d3ff_186deg_258deg,#07103a_258deg_264deg,#d86bff_264deg_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)]">
-                <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
+            <div className="grid h-[calc(100%-44px)] grid-cols-[minmax(145px,190px)_1fr] items-center gap-5 xl:gap-7">
+              <div className="relative mx-auto h-[clamp(136px,17vh,175px)] w-[clamp(136px,17vh,175px)] rounded-full bg-[conic-gradient(#7b5dff_0deg_180deg,#07103a_180deg_186deg,#59d3ff_186deg_258deg,#07103a_258deg_264deg,#d86bff_264deg_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)]">
+                <div className="absolute inset-[clamp(19px,2.5vh,25px)] rounded-full bg-[#0b123f]" />
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[34px] font-extrabold">50%</span>
+                  <span className="text-[clamp(28px,3.2vh,34px)] font-extrabold">50%</span>
                   <span className="text-[11px] text-white/65">Completed</span>
                 </div>
               </div>
@@ -255,8 +255,8 @@ export default function Dashboard() {
               <FaChartBar className="text-[#78aaff]" />
             </div>
 
-            <div className="relative mx-auto h-[205px] w-[88%]">
-              {[30, 68, 106, 144].map((top) => (
+            <div className="relative mx-auto h-[clamp(156px,20vh,205px)] w-[88%] max-w-[620px]">
+              {["18%", "42%", "66%", "90%"].map((top) => (
                 <div
                   key={top}
                   style={{ top }}
@@ -267,7 +267,7 @@ export default function Dashboard() {
               <div className="absolute inset-0 flex items-end justify-around pb-6">
                 {bars.map(([name, value]) => (
                   <div key={name} className="flex flex-col items-center">
-                    <div className="relative flex h-[135px] w-[38px] items-end rounded-[14px] bg-white/10 p-[4px]">
+                    <div className="relative flex h-[clamp(98px,13vh,135px)] w-[clamp(30px,3.4vw,38px)] items-end rounded-[14px] bg-white/10 p-[4px]">
                       <div
                         style={{ height: `${value}%` }}
                         className="w-full rounded-[10px] bg-gradient-to-t from-[#6eb5ff] to-[#5b7dff] shadow-[0_0_20px_rgba(95,150,255,.35)]"
