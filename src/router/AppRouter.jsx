@@ -7,6 +7,7 @@ import Profile from "../pages/Profile/Profile";
 import RecentActivity from "../pages/Profile/RecentActivity";
 import Teams from "../pages/Profile/Teams";
 import Projects from "../pages/Projects/Projects";
+import Community from "../pages/Community/Community";
 import Chat from "../pages/Chat/Chats";
 import Meetings from "../pages/Meetings/Meetings";
 import Settings from "../pages/Settings/Settings";
@@ -22,6 +23,7 @@ export default function AppRouter(){
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/summary" element={<Summary />} />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/community" element={<Community />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/recent-activity" element={<RecentActivity />} />
         <Route path="/teams" element={<Teams />} />
