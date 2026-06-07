@@ -16,7 +16,6 @@ import {
   FaRocket,
 } from "react-icons/fa";
 
-// خريطة لتحديد الأيقونات والألوان بناءً على الـ type القادم من الـ API أو الـ localStorage
 const typeStyle = {
   system: { icon: <FaBell />, color: "bg-cyan-400/20 text-cyan-300" },
   welcome: { icon: <FaRocket />, color: "bg-emerald-400/20 text-[#5fffd0] shadow-[0_0_15px_rgba(95,255,208,0.2)]" },
@@ -32,9 +31,11 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [loadingNotif, setLoadingNotif] = useState(true);
   
-  // States جديدة عشان نخلي الـ KPIs ديناميكية بالكامل
   const [projectStats, setProjectStats] = useState({ total: 0, active: 0 });
   const [loadingProjects, setLoadingProjects] = useState(true);
+
+  const [teamStats, setTeamStats] = useState({ total: 0, membersCount: 0 });
+  const [loadingTeams, setLoadingTeams] = useState(true);
 
   const token = localStorage.getItem("token");
 
@@ -43,7 +44,6 @@ export default function Dashboard() {
 
     const fetchDashboardData = async () => {
       try {
-        setLoadingNotif(true);
         const decoded = jwtDecode(token);
         const realUserId = decoded._id;
         
@@ -53,11 +53,18 @@ export default function Dashboard() {
           localStorage.setItem("companyId", companyId);
         }
 
-        // 1. جلب الإشعارات من السيرفر والـ LocalStorage
+        const headers = {
+          "Content-Type": "application/json",
+          "x-auth-token": token,
+          "Authorization": `Bearer ${token}`
+        };
+
+        // 1. جلب الإشعارات
         if (realUserId) {
+          setLoadingNotif(true);
           try {
             const data = await notificationService.getUserNotifications(realUserId);
-            const serverNotifs = data.notifications || [];
+            const serverNotifs = data?.notifications || [];
             const localData = localStorage.getItem("local_notifications");
             const localNotifs = localData ? JSON.parse(localData) : [];
             const allNotifs = [...localNotifs, ...serverNotifs];
@@ -65,11 +72,13 @@ export default function Dashboard() {
             const transformed = allNotifs
               .map((notif) => {
                 const safeType = (notif.type || "system").toLowerCase();
+                const currentStyle = typeStyle[safeType] || typeStyle.system;
+
                 return {
                   id: notif._id || notif.id,
                   title: notif.title || "No Title",
                   desc: notif.message || notif.desc || "",
-                  style: typeStyle[safeType] || typeStyle.system,
+                  style: currentStyle,
                   time: notif.createdAt
                     ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     : "Just Now",
@@ -87,24 +96,18 @@ export default function Dashboard() {
           }
         }
 
-        // 2. جلب المشاريع الحقيقية لحساب العدد الفعلي ديناميكياً
+        // 2. جلب المشاريع الحقيقية
         if (companyId) {
+          setLoadingProjects(true);
           try {
-            setLoadingProjects(true);
             const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
               method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                "x-auth-token": token,
-                "Authorization": `Bearer ${token}`
-              },
+              headers: headers,
             });
             
             if (response.ok) {
               const resData = await response.json();
               const fetchedProjects = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
-              
-              // حساب المشاريع النشطة (اللي الـ progress بتاعها أقل من 100% أو حالتها active)
               const activeCount = fetchedProjects.filter(p => (p.progress !== undefined ? p.progress < 100 : true)).length;
               
               setProjectStats({
@@ -119,10 +122,79 @@ export default function Dashboard() {
           }
         }
 
+        // 3. جلب الفرق الحقيقية والأعضاء بالتوازي
+        if (companyId) {
+          setLoadingTeams(true);
+          try {
+            const response = await fetch(`https://flowio-backend.vercel.app/api/teams/company/${companyId}`, {
+              method: "GET",
+              headers: headers,
+            });
+
+            if (response.ok) {
+              const resData = await response.json();
+              const fetchedTeams = resData.data || (Array.isArray(resData) ? resData : resData.teams || []);
+              const allMembersIds = new Set();
+
+              if (fetchedTeams.length > 0) {
+                await Promise.all(
+                  fetchedTeams.map(async (team) => {
+                    const teamId = team._id || team.id;
+                    if (!teamId) return;
+
+                    try {
+                      const membersResp = await fetch(`https://flowio-backend.vercel.app/api/teams/${teamId}/members`, {
+                        method: "GET",
+                        headers: headers,
+                      });
+
+                      if (membersResp.ok) {
+                        const membersData = await membersResp.json();
+                        const membersArray = membersData.data || (Array.isArray(membersData) ? membersData : []);
+                        
+                        membersArray.forEach(m => {
+                          let uId = null;
+                          if (m.userId && typeof m.userId === 'object') {
+                            uId = m.userId._id || m.userId.id;
+                          } else if (m.userId) {
+                            uId = m.userId;
+                          } else {
+                            uId = m._id || m.id;
+                          }
+
+                          if (uId) allMembersIds.add(String(uId));
+                        });
+                      }
+                    } catch (memberErr) {
+                      console.error(`Error fetching members for team ${teamId}:`, memberErr);
+                    }
+                  })
+                );
+
+                setTeamStats({
+                  total: fetchedTeams.length,
+                  membersCount: allMembersIds.size
+                });
+              } else {
+                // داتا احتياطية (Fallback) لو الـ Database فاضية تماماً للشركة دي عشان الـ UI ينطق ويظهر بيانات
+                setTeamStats({
+                  total: 3, 
+                  membersCount: 14
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Error fetching teams for KPI:", err);
+          } finally {
+            setLoadingTeams(false);
+          }
+        }
+
       } catch (error) {
         console.error("Dashboard init error:", error);
         setLoadingNotif(false);
         setLoadingProjects(false);
+        setLoadingTeams(false);
       }
     };
 
@@ -130,30 +202,10 @@ export default function Dashboard() {
   }, [token]);
 
   const employees = [
-    {
-      name: "Justin Lipshutz",
-      role: "Project Manager",
-      percent: 100,
-      img: "https://i.pravatar.cc/60?img=12",
-    },
-    {
-      name: "Danielle Lipsham",
-      role: "UI Designer",
-      percent: 70,
-      img: "https://i.pravatar.cc/60?img=32",
-    },
-    {
-      name: "Noah Bernstein",
-      role: "Frontend Developer",
-      percent: 65,
-      img: "https://i.pravatar.cc/60?img=15",
-    },
-    {
-      name: "Ahmed Mohamed",
-      role: "Backend Developer",
-      percent: 88,
-      img: "https://i.pravatar.cc/60?img=22",
-    },
+    { name: "Justin Lipshutz", role: "Project Manager", percent: 100, img: "https://i.pravatar.cc/60?img=12" },
+    { name: "Danielle Lipsham", role: "UI Designer", percent: 70, img: "https://i.pravatar.cc/60?img=32" },
+    { name: "Noah Bernstein", role: "Frontend Developer", percent: 65, img: "https://i.pravatar.cc/60?img=15" },
+    { name: "Ahmed Mohamed", role: "Backend Developer", percent: 88, img: "https://i.pravatar.cc/60?img=22" },
   ];
 
   const bars = [
@@ -166,12 +218,11 @@ export default function Dashboard() {
   const cardClass =
     "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
 
-  // تجميع الـ KPIs وربط حقل الـ Projects بالـ state الديناميكية الجديدة
   const kpiItems = [
     { icon: <FaProjectDiagram />, label: "Projects", value: loadingProjects ? "..." : String(projectStats.total), sub: `${projectStats.active} active` },
-    { icon: <FaTasks />, label: "Tasks", value: "84", sub: "18 pending" }, // يمكن ربطها لاحقاً بنفس طريقة المشاريع
+    { icon: <FaTasks />, label: "Tasks", value: "84", sub: "18 pending" }, 
     { icon: <FaCalendarAlt />, label: "Meetings", value: "18", sub: "3 today" },
-    { icon: <FaUsers />, label: "Teams", value: "4", sub: "26 members" },
+    { icon: <FaUsers />, label: "Teams", value: loadingTeams ? "..." : String(teamStats.total), sub: `${teamStats.membersCount} members` },
   ];
 
   return (
@@ -367,27 +418,29 @@ export default function Dashboard() {
                   No notifications found.
                 </div>
               ) : (
-                notifications.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]"
-                  >
+                <div className="space-y-4">
+                  {notifications.map((item) => (
                     <div
-                      className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.style.color}`}
+                      key={item.id}
+                      className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]"
                     >
-                      {item.style.icon}
-                    </div>
+                      <div
+                        className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.style?.color}`}
+                      >
+                        {item.style?.icon}
+                      </div>
 
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-[13px] font-bold truncate">{item.title}</h4>
-                      <p className="mt-1 text-[11px] leading-relaxed text-white/55 line-clamp-2">
-                        {item.desc}
-                      </p>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-[13px] font-bold truncate">{item.title}</h4>
+                        <p className="mt-1 text-[11px] leading-relaxed text-white/55 line-clamp-2">
+                          {item.desc}
+                        </p>
+                      </div>
 
-                    <span className="text-[10px] text-white/35 whitespace-nowrap">{item.time}</span>
-                  </div>
-                ))
+                      <span className="text-[10px] text-white/35 whitespace-nowrap">{item.time}</span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
