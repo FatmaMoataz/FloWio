@@ -6,19 +6,23 @@ import Footer from "../components/Footer/Footer";
 export default function MainLayout({ children, title }) {
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[radial-gradient(circle_at_left,rgba(0,40,170,.5),transparent_35%),linear-gradient(90deg,#02030f_0%,#07144a_55%,#05060f_100%)] py-8 flex flex-col items-center">
-      <div className="relative w-[92vw] h-[clamp(760px,88vh,980px)] rounded-[32px] border border-[rgba(84,100,220,.45)] bg-[rgba(6,10,30,.82)] flex p-6 shadow-[0_0_35px_rgba(25,40,160,.3)] overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 h-full pl-7 overflow-hidden">
-          {title && <Topbar title={title} />}
-          <div
-            className={
-              title
-                ? "h-[calc(100%-60px)] overflow-hidden"
-                : "h-full overflow-hidden"
-            }
-          >
-            {children}
+    <div className="min-h-screen w-full overflow-x-hidden bg-[linear-gradient(90deg,#040511_0%,#050716_48%,#070933_100%)] py-8 flex flex-col items-center">
+      <div className="relative w-[92vw] h-[clamp(760px,88vh,980px)] p-[3px] rounded-[32px] bg-gradient-to-r from-[#1D1E62] to-[#1B1B34] shadow-[0_0_42px_rgba(28,35,109,.45)]">
+        <div className="w-full h-full rounded-[29px] bg-[radial-gradient(circle_at_50%_47%,#090C4F_0%,#090C4F_28%,#070933_58%,#050716_100%)] flex p-6 overflow-hidden">
+          <Sidebar />
+
+          <div className="flex-1 h-full pl-7 overflow-hidden">
+            {title && <Topbar title={title} />}
+
+            <div
+              className={
+                title
+                  ? "h-[calc(100%-60px)] overflow-hidden"
+                  : "h-full overflow-hidden"
+              }
+            >
+              {children}
+            </div>
           </div>
         </div>
       </div>

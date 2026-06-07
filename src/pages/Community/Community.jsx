@@ -12,6 +12,7 @@ export default function Community() {
   const currentUserId = localStorage.getItem("userId") || "current-user";
   const [openMenuId, setOpenMenuId] = useState(null);
   const [isPollOpen, setIsPollOpen] = useState(false);
+  const [postText, setPostText] = useState("");
   const [pollText, setPollText] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [pollError, setPollError] = useState("");
@@ -118,6 +119,29 @@ export default function Community() {
     setIsPollOpen(false);
   };
 
+  const addPost = (e) => {
+    e.preventDefault();
+
+    const trimmedText = postText.trim();
+    if (!trimmedText) return;
+
+    setPosts((prev) => [
+      {
+        id: Date.now(),
+        authorId: currentUserId,
+        name: "You",
+        role: "Flowio Member",
+        avatar: "https://i.pravatar.cc/100?img=5",
+        content: trimmedText,
+        time: "Just now",
+        liked: false,
+      },
+      ...prev,
+    ]);
+
+    setPostText("");
+  };
+
   const updatePollOption = (index, value) => {
     setPollOptions((prev) =>
       prev.map((option, optionIndex) =>
@@ -153,8 +177,24 @@ export default function Community() {
               className="h-11 w-11 rounded-full object-cover ring-2 ring-[#64CFFF]/25"
             />
 
-            <div className="flex h-13 flex-1 items-center justify-between rounded-[14px] border border-blue-300/10 bg-[#101650]/90 px-5 shadow-[0_14px_34px_rgba(0,0,0,.18)]">
-              <span className="text-xs text-white/55">Write post...</span>
+            <form
+              onSubmit={addPost}
+              className="flex h-13 flex-1 items-center gap-3 rounded-[14px] border border-blue-300/10 bg-[#101650]/90 px-5 shadow-[0_14px_34px_rgba(0,0,0,.18)]"
+            >
+              <input
+                value={postText}
+                onChange={(e) => setPostText(e.target.value)}
+                placeholder="Ask a question..."
+                className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/55"
+              />
+
+              <button
+                type="submit"
+                disabled={!postText.trim()}
+                className="h-8 rounded-full bg-[#5089D6] px-5 text-xs font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Post
+              </button>
 
               <button
                 type="button"
@@ -163,7 +203,7 @@ export default function Community() {
               >
                 + create a poll
               </button>
-            </div>
+            </form>
           </div>
 
           <div className="space-y-5">
