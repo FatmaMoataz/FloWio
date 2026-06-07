@@ -3,6 +3,7 @@ import {
   FaBriefcase,
   FaClipboardList,
   FaUser,
+  FaUsers,
   FaComments,
   FaCog,
 } from "react-icons/fa";
@@ -24,6 +25,11 @@ const links = [
     to: "/profile",
     icon: <FaUser />,
     label: "Profile",
+  },
+  {
+    to: "/community",
+    icon: <FaUsers />,
+    label: "Community",
   },
   {
     to: "/chat",
