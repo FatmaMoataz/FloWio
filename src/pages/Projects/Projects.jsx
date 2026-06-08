@@ -9,6 +9,8 @@ import {
   FaPlus,
   FaTimes,
 } from "react-icons/fa";
+// استيراد الـ API instance الموحد بتاعك اللي فيه الـ interceptors جاهزة
+import API from "../../services/api"; 
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
@@ -21,40 +23,7 @@ export default function Projects() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  const tabs = [
-    { key: "all", label: "All Projects" },
-    { key: "active", label: "Active" },
-    { key: "completed", label: "Completed" },
-  ];
-
-  const cardAccents = [
-    {
-      icon: "text-[#ffa723] bg-[#ffa723]/10 ring-[#ffa723]/25",
-      bar: "bg-[#ffa723]",
-      dot: "bg-[#ffa723]",
-      text: "#ffa723",
-    },
-    {
-      icon: "text-[#58a1ff] bg-[#58a1ff]/10 ring-[#58a1ff]/25",
-      bar: "bg-[#4f8dff]",
-      dot: "bg-[#58a1ff]",
-      text: "#58a1ff",
-    },
-    {
-      icon: "text-[#a47cff] bg-[#a47cff]/10 ring-[#a47cff]/25",
-      bar: "bg-[#a47cff]",
-      dot: "bg-[#a47cff]",
-      text: "#a47cff",
-    },
-    {
-      icon: "text-[#24d7ea] bg-[#24d7ea]/10 ring-[#24d7ea]/25",
-      bar: "bg-[#24d7ea]",
-      dot: "bg-[#24d7ea]",
-      text: "#24d7ea",
-    },
-  ];
-
-  // Determine project card icon dynamically based on title keywords
+  // Dynamic project card icon based on title keywords
   const getProjectIcon = (title = "") => {
     const lowerTitle = title.toLowerCase();
     if (lowerTitle.includes("web") || lowerTitle.includes("design"))
@@ -74,74 +43,56 @@ export default function Projects() {
     return <FaProjectDiagram />;
   };
 
-  // Safely extract token and verified target companyId from active session
-  const getCompanySession = () => {
+  // Extract companyId safely from active token using your auth setup
+  const getCompanyIdFromToken = () => {
     const token = localStorage.getItem("token");
     if (!token) throw new Error("No token found, please login first.");
 
     const decoded = jwtDecode(token);
+    // جلب الـ companyId من الـ token أو الـ localStorage كـ fallback
     let companyId =
       decoded.companyId || decoded.company || localStorage.getItem("companyId");
 
-    // Dynamic Admin Fallback:
-    // If system-admin lacks a dedicated companyId, it safely uses a reliable active corporate ID
-    // Replace the string value below with a valid company _id copy from your MongoDB cluster if necessary
+    // Fallback لـ الادمن في حالة التيست
     if (!companyId && decoded.role === "system-admin") {
       companyId = "66391d5bb96fa3ef34a8145b";
     }
 
     if (!companyId) {
-      throw new Error("Company ID could not be retrieved from login session.");
+      throw new Error("Company context is required to fetch or create projects.");
     }
 
-    return { token, companyId };
+    return companyId;
   };
 
-  // 1. Fetch current projects linked to company context
+  // 1️⃣ Fetch projects linked to the User's Company
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchCompanyProjects = async () => {
       try {
         setLoading(true);
         setError(null);
-        const { token, companyId } = getCompanySession();
+        
+        const companyId = getCompanyIdFromToken();
 
-        const response = await fetch(
-          `https://flowio-backend.vercel.app/api/projects/company/${companyId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              "x-auth-token": token,
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
+        // استخدام الـ API الموحد (Axios) اللي هيبعت الـ Tokens لوحده تلقائياً
+        const response = await API.get(`/api/projects/company/${companyId}`);
 
-        if (!response.ok) {
-          throw new Error(
-            `Server error: ${response.status} - Failed to fetch projects`,
-          );
-        }
-
-        const resData = await response.json();
-
-        // Match with backend controller structure response: res.status(200).json({ success: true, data: projects })
-        const fetchedProjects =
-          resData.data ||
-          (Array.isArray(resData) ? resData : resData.projects || []);
-        setProjects(fetchedProjects);
+        // الباك إند بيرجع البيانات في response.data.data بناءً على الـ Controllers بتاعتك
+        const fetchedProjects = response.data?.data || response.data || [];
+        setProjects(Array.isArray(fetchedProjects) ? fetchedProjects : []);
       } catch (err) {
         console.error("Error fetching projects:", err);
-        setError(err.message);
+        // التعامل مع صيغة خطأ Axios الموحدة عندك
+        setError(err.response?.data?.message || err.message || "Failed to load projects.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProjects();
+    fetchCompanyProjects();
   }, []);
 
-  // 2. Form submission payload to create a persistent new project record
+  // 2️⃣ Handle creating a new project with the mandatory companyId payload
   const handleCreateProject = async (e) => {
     e.preventDefault();
     setFormError(null);
@@ -153,47 +104,27 @@ export default function Projects() {
 
     try {
       setSubmitting(true);
-      const { token, companyId } = getCompanySession();
+      const companyId = getCompanyIdFromToken();
 
+      // الـ Joi schema عندك في الباك إند بتشترط وجود الـ companyId عند الـ POST
       const projectData = {
         name: newProject.name.trim(),
         description: newProject.description.trim(),
         companyId: companyId,
       };
 
-      const response = await fetch(
-        "https://flowio-backend.vercel.app/api/projects",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-auth-token": token,
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(projectData),
-        },
-      );
+      const response = await API.post("/api/projects", projectData);
 
-      const resData = await response.json();
+      const createdProject = response.data?.data || response.data?.project || response.data;
 
-      if (!response.ok) {
-        if (resData.errors && Array.isArray(resData.errors)) {
-          throw new Error(resData.errors.join(" | "));
-        }
-        throw new Error(resData.message || `Server error: ${response.status}`);
-      }
-
-      // Extract newly created document safely from payload structure
-      const createdProject = resData.data || resData.project || resData;
-
-      // Unshift item instantly to the existing list state
+      // تحديث الـ UI فوراً بالمشروع الجديد
       setProjects((prev) => [createdProject, ...prev]);
       setNewProject({ name: "", description: "" });
       setIsModalOpen(false);
     } catch (err) {
       console.error("Error creating project:", err);
       setFormError(
-        err.message || "Something went wrong while creating the project.",
+        err.response?.data?.message || err.message || "Something went wrong while creating the project."
       );
     } finally {
       setSubmitting(false);
@@ -207,7 +138,7 @@ export default function Projects() {
         <div>
           <h2 className="text-xl font-bold text-white">Company Workspace</h2>
           <p className="text-xs text-white/50 mt-1">
-            Manage and track your operational pipeline
+            Manage and track your organization's active projects
           </p>
         </div>
         <button
@@ -239,7 +170,7 @@ export default function Projects() {
       {!loading && !error && projects.length === 0 && (
         <div className="flex h-64 flex-col items-center justify-center text-white/50 bg-[#111b63]/40 rounded-[24px] border border-white/5 p-6 text-center">
           <p className="mb-4">
-            No projects found for this company. Create one to get started!
+            No projects found for your company workspace. Create one to get started!
           </p>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -254,11 +185,9 @@ export default function Projects() {
       {!loading && !error && projects.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-white">
           {projects.map((project) => {
-            const progressValue =
-              project.progress !== undefined ? project.progress : 0;
+            const progressValue = project.progress !== undefined ? project.progress : 0;
             const progressString = `${progressValue}%`;
-            const projectTitle =
-              project.name || project.title || "Untitled Project";
+            const projectTitle = project.name || project.title || "Untitled Project";
 
             return (
               <div
