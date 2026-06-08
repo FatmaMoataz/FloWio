@@ -12,6 +12,7 @@ import Chat from "../pages/Chat/Chats";
 import Meetings from "../pages/Meetings/Meetings";
 import Settings from "../pages/Settings/Settings";
 import Notifications from "../pages/Notifications/Notifications";
+import Schedule from "../pages/Schedule/Schedule";
 
 export default function AppRouter(){
   return (
@@ -32,6 +33,7 @@ export default function AppRouter(){
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/schedule" element={<Schedule />} />
       </Routes>
     </BrowserRouter>
   )
