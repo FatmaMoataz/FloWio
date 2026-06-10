@@ -3,6 +3,7 @@ import {
   FaBriefcase,
   FaClipboardList,
   FaUser,
+  FaTasks,
   FaUsers,
   FaComments,
   FaCog,
@@ -25,6 +26,11 @@ const links = [
     to: "/profile",
     icon: <FaUser />,
     label: "Profile",
+  },
+  {
+    to: "/to-do",
+    icon: <FaTasks />,
+    label: "To-Do List",
   },
   {
     to: "/community",
