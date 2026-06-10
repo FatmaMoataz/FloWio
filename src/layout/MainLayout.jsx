@@ -3,7 +3,13 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import Topbar from "../components/Topbar/Topbar";
 import Footer from "../components/Footer/Footer";
 
-export default function MainLayout({ children, title }) {
+export default function MainLayout({
+  children,
+  title,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
+}) {
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[linear-gradient(90deg,#040511_0%,#050716_48%,#070933_100%)] py-8 flex flex-col items-center">
@@ -12,7 +18,14 @@ export default function MainLayout({ children, title }) {
           <Sidebar />
 
           <div className="flex-1 h-full pl-7 overflow-hidden">
-            {title && <Topbar title={title} />}
+            {title && (
+              <Topbar
+                title={title}
+                searchValue={searchValue}
+                onSearchChange={onSearchChange}
+                searchPlaceholder={searchPlaceholder}
+              />
+            )}
 
             <div
               className={

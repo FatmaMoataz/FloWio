@@ -4,6 +4,8 @@ import {
   FaRegHeart,
   FaRegComment,
   FaEllipsisH,
+  FaPaperPlane,
+  FaTrash,
   FaTimes,
 } from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
@@ -11,6 +13,8 @@ import MainLayout from "../../layout/MainLayout";
 export default function Community() {
   const currentUserId = localStorage.getItem("userId") || "current-user";
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [openCommentsId, setOpenCommentsId] = useState(null);
+  const [commentDrafts, setCommentDrafts] = useState({});
   const [isPollOpen, setIsPollOpen] = useState(false);
   const [postText, setPostText] = useState("");
   const [pollText, setPollText] = useState("");
@@ -27,6 +31,7 @@ export default function Community() {
         "We tried other tools such as Boom, Gologolo Meet, etc. There is nothing as good as meet.line yet!",
       time: "2 hours ago",
       liked: false,
+      comments: [],
     },
     {
       id: 2,
@@ -38,6 +43,7 @@ export default function Community() {
         "We tried other tools such as Boom, Gologolo Meet, etc. There is nothing as good as meet.line yet!",
       time: "2 hours ago",
       liked: false,
+      comments: [],
     },
   ]);
 
@@ -54,6 +60,54 @@ export default function Community() {
 
     setPosts((prev) => prev.filter((post) => post.id !== postId));
     setOpenMenuId(null);
+  };
+
+  const addComment = (event, postId) => {
+    event.preventDefault();
+    const content = (commentDrafts[postId] || "").trim();
+
+    if (!content) return;
+
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              comments: [
+                ...(post.comments || []),
+                {
+                  id: `${Date.now()}-${Math.random()}`,
+                  authorId: currentUserId,
+                  name: "You",
+                  avatar: "https://i.pravatar.cc/100?img=5",
+                  content,
+                  time: "Just now",
+                },
+              ],
+            }
+          : post,
+      ),
+    );
+    setCommentDrafts((prev) => ({ ...prev, [postId]: "" }));
+  };
+
+  const deleteComment = (postId, commentId) => {
+    if (!window.confirm("Are you sure you want to delete this comment?")) {
+      return;
+    }
+
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              comments: (post.comments || []).filter(
+                (comment) => comment.id !== commentId,
+              ),
+            }
+          : post,
+      ),
+    );
   };
 
   const togglePollVote = (postId, optionIndex) => {
@@ -109,6 +163,7 @@ export default function Community() {
         userVote: null,
         time: "Just now",
         liked: false,
+        comments: [],
       },
       ...prev,
     ]);
@@ -135,6 +190,7 @@ export default function Community() {
         content: trimmedText,
         time: "Just now",
         liked: false,
+        comments: [],
       },
       ...prev,
     ]);
@@ -335,9 +391,24 @@ export default function Community() {
 
                       <button
                         type="button"
-                        className="text-white transition hover:text-cyan-400"
+                        onClick={() =>
+                          setOpenCommentsId(
+                            openCommentsId === post.id ? null : post.id,
+                          )
+                        }
+                        className={`flex items-center gap-2 transition ${
+                          openCommentsId === post.id
+                            ? "text-cyan-400"
+                            : "text-white hover:text-cyan-400"
+                        }`}
+                        aria-label="Show comments"
                       >
                         <FaRegComment />
+                        {(post.comments || []).length > 0 && (
+                          <span className="text-xs font-bold">
+                            {(post.comments || []).length}
+                          </span>
+                        )}
                       </button>
                     </div>
 
@@ -345,6 +416,84 @@ export default function Community() {
                       - {post.time}
                     </span>
                   </div>
+
+                  {openCommentsId === post.id && (
+                    <div className="mt-4 border-t border-white/10 pt-4">
+                      <form
+                        onSubmit={(event) => addComment(event, post.id)}
+                        className="flex items-center gap-3"
+                      >
+                        <img
+                          src="https://i.pravatar.cc/100?img=5"
+                          alt=""
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                        <input
+                          value={commentDrafts[post.id] || ""}
+                          onChange={(event) =>
+                            setCommentDrafts((prev) => ({
+                              ...prev,
+                              [post.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="Add a comment..."
+                          className="h-10 min-w-0 flex-1 rounded-[14px] border border-white/10 bg-[#080d31] px-4 text-xs text-white outline-none placeholder:text-white/35 focus:border-[#64CFFF]/60"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!(commentDrafts[post.id] || "").trim()}
+                          className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#5089D6] text-sm text-white transition hover:bg-[#447bc4] disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label="Add comment"
+                        >
+                          <FaPaperPlane />
+                        </button>
+                      </form>
+
+                      <div className="mt-4 space-y-3">
+                        {(post.comments || []).map((comment) => (
+                          <div
+                            key={comment.id}
+                            className="flex items-start gap-3 rounded-2xl bg-white/[0.04] p-3"
+                          >
+                            <img
+                              src={comment.avatar}
+                              alt=""
+                              className="h-8 w-8 rounded-full object-cover"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold">
+                                  {comment.name}
+                                </span>
+                                <span className="text-[9px] text-white/35">
+                                  {comment.time}
+                                </span>
+                              </div>
+                              <p className="mt-1 break-words text-xs leading-5 text-white/75">
+                                {comment.content}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteComment(post.id, comment.id)
+                              }
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white/30 transition hover:bg-red-400/10 hover:text-red-300"
+                              aria-label="Delete comment"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        ))}
+
+                        {(post.comments || []).length === 0 && (
+                          <p className="py-2 text-center text-xs text-white/35">
+                            No comments yet. Start the conversation.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </article>
               );
             })}

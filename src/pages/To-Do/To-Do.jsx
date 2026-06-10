@@ -1,229 +1,179 @@
-import { useState } from "react";
-import { FaSearch, FaPlus, FaCheck, FaTimes } from "react-icons/fa";
+import { useMemo, useState } from "react";
+import {
+  FaCheck,
+  FaClipboardCheck,
+  FaPlus,
+  FaRegCircle,
+  FaTrash,
+} from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
 
-export default function Todo() {
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      title: "Optimize Web Content",
-      completed: false,
-      priority: "purple",
-      dueDate: "Sep 15",
-      category: "",
-    },
-    {
-      id: 2,
-      title: "Update Portfolio Case Study",
-      completed: true,
-      priority: "green",
-      dueDate: "Sep 15",
-      category: "",
-    },
-    {
-      id: 3,
-      title: "Design new home page layout",
-      completed: false,
-      priority: "red",
-      dueDate: "Sep 15",
-      category: "",
-    },
-    {
-      id: 4,
-      title: "Create wireframe for landing page",
-      completed: true,
-      priority: "red",
-      dueDate: "Sep 15",
-      category: "",
-    },
-    {
-      id: 5,
-      title: "Get some coffee in the lunch break",
-      completed: true,
-      priority: "gray",
-      dueDate: "Today",
-      category: "Personal",
-    },
-  ]);
-
+export default function ToDo() {
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState("");
+  const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [newTask, setNewTask] = useState({
-    title: "",
-    priority: "purple",
-    dueDate: "",
-    category: "",
-  });
+  const visibleTasks = useMemo(() => {
+    const query = search.trim().toLowerCase();
 
-  const filteredTasks = tasks.filter((task) =>
-    task.title.toLowerCase().includes(search.toLowerCase()),
-  );
+    return tasks.filter((task) => {
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "active" && !task.completed) ||
+        (filter === "completed" && task.completed);
+      const matchesSearch = !query || task.title.toLowerCase().includes(query);
 
-  const toggleTask = (id) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task,
+      return matchesFilter && matchesSearch;
+    });
+  }, [filter, search, tasks]);
+
+  const completedCount = tasks.filter((task) => task.completed).length;
+
+  const addTask = (event) => {
+    event.preventDefault();
+    const title = newTask.trim();
+
+    if (!title) return;
+
+    setTasks((currentTasks) => [
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        title,
+        completed: false,
+      },
+      ...currentTasks,
+    ]);
+    setNewTask("");
+  };
+
+  const toggleTask = (taskId) => {
+    setTasks((currentTasks) =>
+      currentTasks.map((task) =>
+        task.id === taskId ? { ...task, completed: !task.completed } : task,
       ),
     );
   };
 
-  const addTask = (e) => {
-    e.preventDefault();
-
-    if (!newTask.title.trim()) return;
-
-    setTasks((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        completed: false,
-        ...newTask,
-      },
-    ]);
-
-    setNewTask({
-      title: "",
-      priority: "purple",
-      dueDate: "",
-      category: "",
-    });
-
-    setIsModalOpen(false);
+  const deleteTask = (taskId) => {
+    setTasks((currentTasks) =>
+      currentTasks.filter((task) => task.id !== taskId),
+    );
   };
 
-  const priorityColor = {
-    purple: "bg-[#B89BFF]",
-    green: "bg-[#57D1A4]",
-    red: "bg-[#FF8C8C]",
-    gray: "bg-[#56618A]",
-  };
+  const emptyMessage = search.trim()
+    ? "No tasks match your search."
+    : filter === "all"
+      ? "Add a task above to start planning your work."
+      : `No ${filter} tasks here.`;
 
   return (
-    <MainLayout title="Tasks">
-      <div className="h-full overflow-y-auto text-white pr-2">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold">Welcome, Justin!</h2>
+    <MainLayout
+      title="To-Do List"
+      searchValue={search}
+      onSearchChange={setSearch}
+      searchPlaceholder="Search tasks..."
+    >
+      <div className="h-full overflow-y-auto pr-2 pb-6 text-white">
+        <section className="rounded-[28px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_16px_40px_rgba(1,4,25,.24)]">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white/55">Keep your day organized</p>
+              <p className="mt-2 font-semibold text-[#7db6ff]">
+                {completedCount} of {tasks.length} tasks completed
+              </p>
+            </div>
 
-          <p className="mt-2 text-white/60">Here's your to-do list:</p>
-        </div>
-
-        {/* Search + Add */}
-        <div className="mb-8 flex items-center gap-4">
-          <div className="flex h-12 flex-1 items-center rounded-2xl bg-[#13195D] px-4">
-            <FaSearch className="text-white/40" />
-
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tasks..."
-              className="ml-3 w-full bg-transparent outline-none placeholder:text-white/40"
-            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-300/15 text-xl text-[#7db6ff]">
+              <FaClipboardCheck />
+            </div>
           </div>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="h-10 rounded-[32px] bg-[#5089D6] px-6 font-bold transition-colors hover:bg-[#447bc4]"
-          >
-            + Add Task
-          </button>
-        </div>
-
-        {/* Task Container */}
-        <div className="rounded-[28px] bg-[#11175A]/95 p-5">
-          {filteredTasks.map((task) => (
-            <div
-              key={task.id}
-              className="flex items-center justify-between border-b border-white/10 py-5"
+          <form onSubmit={addTask} className="flex items-center gap-3">
+            <input
+              value={newTask}
+              onChange={(event) => setNewTask(event.target.value)}
+              placeholder="What needs to be done?"
+              aria-label="New task"
+              className="h-12 min-w-0 flex-1 rounded-[20px] border border-[#5089D6]/70 bg-[#080d31] px-5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-[#64CFFF]"
+            />
+            <button
+              type="submit"
+              className="flex h-10 items-center gap-2 rounded-[24px] bg-[#5089D6] px-6 font-bold text-white transition-colors hover:bg-[#447bc4]"
             >
-              <div className="flex items-center gap-5">
-                <button
-                  onClick={() => toggleTask(task.id)}
-                  className={`flex h-7 w-7 items-center justify-center rounded border-2 transition ${
-                    task.completed
-                      ? "border-white bg-transparent"
-                      : "border-white/70"
-                  }`}
-                >
-                  {task.completed && <FaCheck className="text-sm" />}
-                </button>
+              <FaPlus />
+              Add Task
+            </button>
+          </form>
+        </section>
 
-                <div
-                  className={`h-4 w-4 rounded-full ${
-                    priorityColor[task.priority]
-                  }`}
-                />
-
-                {task.category && (
-                  <span className="rounded-full bg-[#5C67A4] px-3 py-1 text-xs">
-                    {task.category}
-                  </span>
-                )}
-
-                <span className="text-xl">{task.title}</span>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div
-                  className={`h-4 w-4 rounded-full ${
-                    priorityColor[task.priority]
-                  }`}
-                />
-
-                <span className="text-lg text-white/80">{task.dueDate}</span>
-              </div>
-            </div>
+        <div className="my-6 flex gap-2">
+          {["all", "active", "completed"].map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setFilter(item)}
+              className={`rounded-[14px] px-5 py-3 text-sm font-semibold capitalize transition ${
+                filter === item
+                  ? "bg-blue-300/15 text-[#7db6ff]"
+                  : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {item}
+            </button>
           ))}
         </div>
 
-        {/* Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-[28px] bg-[#11175A] p-6">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-xl font-bold">Add Task</h3>
+        <section className="space-y-3">
+          {visibleTasks.map((task) => (
+            <article
+              key={task.id}
+              className="flex items-center gap-4 rounded-[20px] border border-white/5 bg-[#10184c]/70 p-4 transition hover:border-blue-300/20 hover:bg-[#121c58]"
+            >
+              <button
+                type="button"
+                onClick={() => toggleTask(task.id)}
+                aria-label={
+                  task.completed ? "Mark task as active" : "Complete task"
+                }
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition ${
+                  task.completed
+                    ? "border-[#5fffd0]/40 bg-[#5fffd0]/15 text-[#5fffd0]"
+                    : "border-white/15 text-white/35 hover:border-[#7db6ff]/60 hover:text-[#7db6ff]"
+                }`}
+              >
+                {task.completed ? <FaCheck /> : <FaRegCircle />}
+              </button>
 
-                <button onClick={() => setIsModalOpen(false)}>
-                  <FaTimes />
-                </button>
-              </div>
+              <p
+                className={`min-w-0 flex-1 break-words ${
+                  task.completed
+                    ? "text-white/35 line-through"
+                    : "text-white/85"
+                }`}
+              >
+                {task.title}
+              </p>
 
-              <form onSubmit={addTask} className="space-y-4">
-                <input
-                  placeholder="Task name"
-                  value={newTask.title}
-                  onChange={(e) =>
-                    setNewTask({
-                      ...newTask,
-                      title: e.target.value,
-                    })
-                  }
-                  className="h-12 w-full rounded-xl bg-[#0D124A] px-4 outline-none"
-                />
+              <button
+                type="button"
+                onClick={() => deleteTask(task.id)}
+                aria-label={`Delete ${task.title}`}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/30 transition hover:bg-red-400/10 hover:text-red-300"
+              >
+                <FaTrash />
+              </button>
+            </article>
+          ))}
 
-                <input
-                  placeholder="Due date"
-                  value={newTask.dueDate}
-                  onChange={(e) =>
-                    setNewTask({
-                      ...newTask,
-                      dueDate: e.target.value,
-                    })
-                  }
-                  className="h-12 w-full rounded-xl bg-[#0D124A] px-4 outline-none"
-                />
-
-                <button
-                  type="submit"
-                  className="h-12 w-full rounded-xl bg-[#5089D6] font-bold"
-                >
-                  Create Task
-                </button>
-              </form>
+          {visibleTasks.length === 0 && (
+            <div className="rounded-[28px] border border-dashed border-blue-300/15 bg-white/[0.025] py-16 text-center">
+              <FaClipboardCheck className="mx-auto mb-3 text-4xl text-[#5089D6]/75" />
+              <p className="font-bold text-white/70">No tasks here yet</p>
+              <p className="mt-2 text-sm text-white/35">{emptyMessage}</p>
             </div>
-          </div>
-        )}
+          )}
+        </section>
       </div>
     </MainLayout>
   );

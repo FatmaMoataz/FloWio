@@ -23,7 +23,7 @@ export default function Footer() {
   alt="Flowio"
   className="h-[54px] w-[54px] rounded-[16px] object-cover scale-[1.18]"
 />
-            <h2 className="bg-gradient-to-r from-white via-[#82b6ff] to-[#4e7dff] bg-clip-text text-[34px] font-extrabold text-transparent">
+            <h2 className="bg-linear-to-b from-[#4F58AF] to-[#64CFFF] bg-clip-text text-[34px] font-extrabold text-transparent">
               Flowio
             </h2>
           </div>
