@@ -193,8 +193,8 @@ const handleSubmit = async (e) => {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_left,rgba(0,40,170,.48),transparent_35%),linear-gradient(90deg,#02030f,#07144a_55%,#05060f)] p-3 text-white sm:p-6 lg:p-8">
-      <div className="w-full max-w-[460px] rounded-3xl border border-blue-300/15 bg-[#081142]/90 p-5 shadow-[0_0_60px_rgba(30,60,180,.25)] sm:rounded-4xl sm:p-8">
+    <div className="flowio-auth-page flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_left,rgba(0,40,170,.48),transparent_35%),linear-gradient(90deg,#02030f,#07144a_55%,#05060f)] p-3 text-white sm:p-6 lg:p-8">
+      <div className="flowio-auth-card w-full max-w-[460px] rounded-3xl border border-blue-300/15 bg-[#081142]/90 p-5 shadow-[0_0_60px_rgba(30,60,180,.25)] sm:rounded-4xl sm:p-8">
         <div className="flex items-center justify-center gap-3 mb-4">
           <img
             src={logo}

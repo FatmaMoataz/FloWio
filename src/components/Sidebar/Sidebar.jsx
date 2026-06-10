@@ -47,7 +47,7 @@ const links = [
 export default function Sidebar() {
   return (
     <aside
-      className="
+      className="flowio-sidebar
       w-full
       h-auto
       shrink-0

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";import {
+import { useEffect, useState } from "react";
+import {
   FaPalette,
   FaDesktop,
   FaBell,
@@ -11,6 +12,11 @@ import { useState, useEffect } from "react";import {
   FaSave,
   FaCheck,
 } from "react-icons/fa";
+import {
+  applyTheme,
+  getThemePreference,
+  setThemePreference,
+} from "../../../utils/theme";
 
 const Toggle = ({ checked, onClick }) => (
   <button
@@ -33,7 +39,7 @@ export default function GeneralSettings() {
     localStorage.getItem("flowio-general") || "{}"
   );
 
-  const [mode, setMode] = useState(savedData.mode || "Dark");
+  const [mode, setMode] = useState(getThemePreference());
   const [defaultPage, setDefaultPage] = useState(
     savedData.defaultPage || "Dashboard"
   );
@@ -58,20 +64,10 @@ export default function GeneralSettings() {
  const [saved, setSaved] = useState(false);
 
 useEffect(() => {
-  const savedTheme = localStorage.getItem("flowio-theme") || "Dark";
+  const savedTheme = getThemePreference();
+  setMode(savedTheme);
   applyTheme(savedTheme);
 }, []);
-
-const applyTheme = (theme) => {
-  setMode(theme);
-  localStorage.setItem("flowio-theme", theme);
-
-  if (theme === "Light") {
-    document.documentElement.classList.add("flowio-light");
-  } else {
-    document.documentElement.classList.remove("flowio-light");
-  }
-};
 
 const updateToggle = (key) => {
   const updated = {
@@ -139,7 +135,7 @@ const updateToggle = (key) => {
                 type="button"
                 onClick={() => {
                   setMode(item);
-                  localStorage.setItem("flowio-theme", item);
+                  setThemePreference(item);
                 }}
                 className={`h-10 rounded-[14px] text-xs font-bold transition-all duration-300 ${
                   mode === item
@@ -158,8 +154,8 @@ const updateToggle = (key) => {
             </h4>
 
             <p className="text-[11px] leading-relaxed text-white/50">
-              Flowio currently uses the official dark blue design system across
-              all pages. Your selected mode is saved locally.
+              Flowio applies your selected theme across every page and saves it
+              on this device.
             </p>
           </div>
         </div>

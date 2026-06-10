@@ -21,6 +21,9 @@ body {
   font-family: "Outfit", sans-serif;
   background: #05071c;
   overflow-x: hidden;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 img,
@@ -67,4 +70,178 @@ a {
 ::-webkit-scrollbar-thumb {
   background: rgba(110, 181, 255, 0.35);
   border-radius: 999px;
+}
+
+/* Icy-blue light theme */
+.flowio-light {
+  color-scheme: light;
+}
+
+.flowio-light body {
+  background: #f7fbff;
+  color: #14213d;
+}
+
+.flowio-light .flowio-app-shell,
+.flowio-light .flowio-auth-page {
+  background: linear-gradient(135deg, #f9fcff 0%, #edf5ff 55%, #f8fbff 100%) !important;
+}
+
+.flowio-light .flowio-app-frame {
+  background: linear-gradient(135deg, #d8e8fb, #f8fbff) !important;
+  box-shadow: 0 18px 45px rgba(72, 103, 142, 0.2) !important;
+}
+
+.flowio-light .flowio-app-surface {
+  background: linear-gradient(145deg, #f4f9ff, #eaf3ff) !important;
+}
+
+.flowio-light .flowio-sidebar {
+  background: #e3efff !important;
+  border-color: #c9dcf3 !important;
+  box-shadow: 0 10px 24px rgba(73, 104, 143, 0.16);
+}
+
+.flowio-light .flowio-topbar-control,
+.flowio-light .flowio-auth-card,
+.flowio-light .flowio-footer {
+  background: #f5f9ff !important;
+  border-color: #cbdcf0 !important;
+  box-shadow: 0 12px 28px rgba(75, 105, 141, 0.16) !important;
+}
+
+.flowio-light .flowio-topbar-control {
+  color: #1976f3 !important;
+}
+
+.flowio-light .flowio-footer {
+  background-image: linear-gradient(145deg, #f6faff, #e8f2ff) !important;
+}
+
+.flowio-light [class*="bg-[#05091f]"] {
+  background-color: #07133f !important;
+}
+
+.flowio-light [class*="bg-[#10184c]"],
+.flowio-light [class*="bg-[#11175A]"],
+.flowio-light [class*="bg-[#111b63]"],
+.flowio-light [class*="bg-[#101650]"],
+.flowio-light [class*="bg-[#121957]"],
+.flowio-light [class*="bg-[#0d1442]"],
+.flowio-light [class*="bg-[#0b1246]"],
+.flowio-light [class*="bg-[#0D124A]"],
+.flowio-light [class*="bg-[#141d66]"],
+.flowio-light [class*="bg-[#141f69]"],
+.flowio-light [class*="bg-[#151f62]"],
+.flowio-light [class*="bg-[#172371]"],
+.flowio-light [class*="bg-[#080d31]"],
+.flowio-light [class*="bg-[#0a0f35]"] {
+  background-color: #f4f8fe !important;
+  border-color: #cadcf1 !important;
+}
+
+.flowio-light [class*="bg-[#242279]"] {
+  background-color: #e9eef5 !important;
+  background-image: none !important;
+  color: #24324a !important;
+  box-shadow: none !important;
+}
+
+.flowio-light [class*="bg-[#242279]"] * {
+  color: #24324a !important;
+}
+
+.flowio-light [class*="bg-[#0b123f]"],
+.flowio-light [class*="bg-[#070b2d]"],
+.flowio-light [class*="bg-[#090d34]"] {
+  background-color: #eef5fd !important;
+}
+
+.flowio-light [class*="from-[#151e66]"],
+.flowio-light [class*="from-[#151d60]"],
+.flowio-light [class*="from-[#16206d]"],
+.flowio-light [class*="from-[#151f68]"],
+.flowio-light [class*="from-[#131d68]"],
+.flowio-light [class*="from-[#1c2a87]"],
+.flowio-light [class*="from-[#09103a]"] {
+  background-color: #f7faff !important;
+  background-image: none !important;
+  border-color: #ccdef2 !important;
+  box-shadow: 0 10px 24px rgba(77, 105, 139, 0.16) !important;
+}
+
+.flowio-light [class*="text-white"] {
+  color: #17233d !important;
+}
+
+.flowio-light [class*="placeholder:text-white"]::placeholder {
+  color: #7e8da6 !important;
+  opacity: 1;
+}
+
+.flowio-light input,
+.flowio-light textarea,
+.flowio-light select {
+  color: #17233d;
+}
+
+.flowio-light [class*="border-white"] {
+  border-color: #d2dfef !important;
+}
+
+.flowio-light [class*="bg-white/"] {
+  background-color: rgba(211, 226, 244, 0.6) !important;
+}
+
+.flowio-light [class*="shadow-[0_"] {
+  --tw-shadow-color: rgba(69, 96, 130, 0.18);
+}
+
+.flowio-light button[class*="from-[#6eb5ff]"],
+.flowio-light button[class*="from-[#69b5ff]"],
+.flowio-light button[class*="from-sky-400"],
+.flowio-light a[class*="from-[#6eb5ff]"],
+.flowio-light a[class*="from-sky-400"],
+.flowio-light [class*="bg-[#5089D6]"] {
+  background-color: #1976f3 !important;
+  background-image: none !important;
+  border-color: #1976f3 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.flowio-light button[class*="from-[#6eb5ff]"] *,
+.flowio-light button[class*="from-[#69b5ff]"] *,
+.flowio-light button[class*="from-sky-400"] *,
+.flowio-light a[class*="from-[#6eb5ff]"] *,
+.flowio-light a[class*="from-sky-400"] *,
+.flowio-light [class*="bg-[#5089D6]"] * {
+  color: #ffffff !important;
+}
+
+.flowio-light button[class*="bg-gradient-to-r"][class*="from-[#6eb5ff]"],
+.flowio-light button[class*="bg-gradient-to-r"][class*="from-[#69b5ff]"] {
+  background: #1976f3 !important;
+}
+
+.flowio-light [class*="text-[#78aaff]"],
+.flowio-light [class*="text-[#7db6ff]"],
+.flowio-light [class*="text-[#82b6ff]"],
+.flowio-light [class*="text-cyan-"] {
+  color: #1976f3 !important;
+}
+
+.flowio-light [class*="bg-blue-300/15"],
+.flowio-light [class*="bg-blue-400/15"],
+.flowio-light [class*="bg-blue-400/20"] {
+  background-color: #dbeaff !important;
+}
+
+.flowio-light [class*="rounded-full"][class*="bg-gradient"],
+.flowio-light [class*="rounded-full"][class*="from-[#"] {
+  color: #ffffff !important;
+}
+
+.flowio-light ::-webkit-scrollbar-thumb {
+  background: rgba(25, 118, 243, 0.35);
 }

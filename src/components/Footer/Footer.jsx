@@ -11,7 +11,7 @@ import logo from "../../assets/logo.svg";
 
 export default function Footer() {
   return (
-    <footer className="relative mx-auto mb-4 mt-8 w-full overflow-hidden rounded-[24px] border border-blue-300/10 bg-[radial-gradient(circle_at_top_right,rgba(110,181,255,.10),transparent_35%),linear-gradient(180deg,#09103a,#060b28)] shadow-[0_0_45px_rgba(25,40,160,.18)] sm:mb-6 sm:mt-10 sm:rounded-[28px] lg:mb-8 lg:mt-16 lg:w-[88vw] lg:rounded-[32px]">
+    <footer className="flowio-footer relative mx-auto mb-4 mt-8 w-full overflow-hidden rounded-[24px] border border-blue-300/10 bg-[radial-gradient(circle_at_top_right,rgba(110,181,255,.10),transparent_35%),linear-gradient(180deg,#09103a,#060b28)] shadow-[0_0_45px_rgba(25,40,160,.18)] sm:mb-6 sm:mt-10 sm:rounded-[28px] lg:mb-8 lg:mt-16 lg:w-[88vw] lg:rounded-[32px]">
       <div className="absolute -left-20 top-0 h-60 w-60 rounded-full bg-blue-500/10 blur-3xl" />
       <div className="absolute -right-20 bottom-0 h-60 w-60 rounded-full bg-indigo-500/10 blur-3xl" />
 
