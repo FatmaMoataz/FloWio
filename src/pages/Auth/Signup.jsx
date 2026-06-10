@@ -104,7 +104,11 @@ const handleSubmit = async (e) => {
       // حفظ إشعار الترحيب المحلي الموحد بالاسم المكتوب
       saveWelcomeNotification(form.fullName);
 
-      navigate("/dashboard");
+      navigate(
+        form.role === "system-admin"
+          ? "/company-onboarding"
+          : "/dashboard",
+      );
     } catch (error) {
       console.error("Signup error:", error);
       toast.error(
@@ -152,7 +156,14 @@ const handleSubmit = async (e) => {
     }
   };
 
-  const Dropdown = ({ type, icon, placeholder, items }) => (
+  const Dropdown = ({ type, icon, placeholder, items }) => {
+    const selectedItem = items.find((item) =>
+      typeof item === "string" ? item === form[type] : item.value === form[type],
+    );
+    const selectedLabel =
+      typeof selectedItem === "string" ? selectedItem : selectedItem?.label;
+
+    return (
     <div className="relative flex-1">
       <button
         type="button"
@@ -166,7 +177,7 @@ const handleSubmit = async (e) => {
             form[type] ? "text-white" : "text-white/40"
           }`}
         >
-          {form[type] || placeholder}
+          {selectedLabel || placeholder}
         </span>
 
         <span className="ml-auto text-xs text-white/50">▾</span>
@@ -174,23 +185,29 @@ const handleSubmit = async (e) => {
 
       {open === type && (
         <div className="absolute left-0 top-15.5 z-50 w-full rounded-2xl border border-[#243d93]/40 bg-[#0b1246] p-2 shadow-[0_12px_30px_rgba(0,0,0,.45)]">
-          {items.map((item) => (
+          {items.map((item) => {
+            const value = typeof item === "string" ? item : item.value;
+            const label = typeof item === "string" ? item : item.label;
+
+            return (
             <button
-              key={item}
+              key={value}
               type="button"
               onClick={() => {
-                setField(type, item);
+                setField(type, value);
                 setOpen(null);
               }}
               className="w-full h-10 rounded-xl px-3 text-left text-sm text-white hover:bg-blue-300/15"
             >
-              {item}
+              {label}
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="flowio-auth-page flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_left,rgba(0,40,170,.48),transparent_35%),linear-gradient(90deg,#02030f,#07144a_55%,#05060f)] p-3 text-white sm:p-6 lg:p-8">
@@ -296,10 +313,10 @@ const handleSubmit = async (e) => {
               icon={<FaRegUser />}
               placeholder="Role"
               items={[
-                "system-admin",
-                "project-manager",
-                "founder",
-                "team-member",
+                { label: "Company Admin", value: "system-admin" },
+                { label: "Project Manager", value: "project-manager" },
+                { label: "Founder", value: "founder" },
+                { label: "Team Member", value: "team-member" },
               ]}
             />
           </div>

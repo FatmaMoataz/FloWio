@@ -14,6 +14,7 @@ import Settings from "../pages/Settings/Settings";
 import Notifications from "../pages/Notifications/Notifications";
 import Schedule from "../pages/Schedule/Schedule";
 import ToDo from "../pages/To-Do/To-Do";
+import CompanyOnboarding from "../pages/Onboarding/CompanyOnboarding";
 
 export default function AppRouter(){
   return (
@@ -36,6 +37,7 @@ export default function AppRouter(){
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/to-do" element={<ToDo />} />
+        <Route path="/company-onboarding" element={<CompanyOnboarding />} />
       </Routes>
     </BrowserRouter>
   )
