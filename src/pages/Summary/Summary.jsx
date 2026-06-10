@@ -166,7 +166,7 @@ export default function Summary() {
 
   return (
     <MainLayout>
-      <div className="h-full w-full overflow-hidden text-white">
+      <div className="w-full text-white lg:h-full lg:overflow-hidden">
         {/* BREADCRUMB */}
         <div className="mb-5 flex h-[26px] items-center gap-3 text-xs text-white/55">
           <FaChevronLeft />
@@ -177,7 +177,7 @@ export default function Summary() {
           <b className="text-white">Flowio Project</b>
         </div>
 
-        <div className="grid h-[calc(100%-46px)] grid-cols-[300px_1fr] gap-8">
+        <div className="grid gap-5 lg:h-[calc(100%-46px)] lg:grid-cols-[300px_1fr] lg:gap-8">
           {/* ARCHIVE */}
           <div className="flex h-full flex-col rounded-[26px] border border-indigo-300/10 bg-gradient-to-b from-[#131d68]/95 to-[#0c144a]/95 p-5 shadow-[0_18px_42px_rgba(0,0,0,.24)]">
             <div className="mb-4 flex items-center justify-between">
@@ -240,7 +240,7 @@ export default function Summary() {
           {/* RIGHT CONTENT */}
           <div className="grid h-full grid-rows-[82px_1fr_1fr] gap-6 overflow-hidden">
             {/* STATS */}
-            <div className="grid grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
               {[
                 [<FaClipboardList />, "Meetings", meetingsData.length],
                 [<FaTasks />, "Tasks", tasks.length],
@@ -280,7 +280,7 @@ export default function Summary() {
                 </span>
               </div>
 
-              <ul className="grid grid-cols-2 gap-4">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {activeMeeting.summary.map((item) => (
                   <li
                     key={item}
@@ -303,7 +303,7 @@ export default function Summary() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
                 {tasks.map((task) => (
                   <div
                     key={task.name}

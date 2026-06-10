@@ -215,7 +215,7 @@ export default function Community() {
 
   return (
     <MainLayout title="Community">
-      <div className="relative h-full min-h-0 overflow-y-auto pr-2 text-white">
+      <div className="relative h-full min-h-0 overflow-y-auto text-white lg:pr-2">
         {openMenuId && (
           <button
             type="button"
@@ -226,22 +226,22 @@ export default function Community() {
         )}
 
         <div className="mx-auto flex w-full max-w-[820px] flex-col">
-          <div className="mx-auto mb-7 flex w-full max-w-[760px] items-center gap-4">
+          <div className="mx-auto mb-7 flex w-full max-w-[760px] items-start gap-3 sm:items-center sm:gap-4">
             <img
               src="https://i.pravatar.cc/100?img=5"
               alt=""
-              className="h-11 w-11 rounded-full object-cover ring-2 ring-[#64CFFF]/25"
+              className="hidden h-11 w-11 rounded-full object-cover ring-2 ring-[#64CFFF]/25 sm:block"
             />
 
             <form
               onSubmit={addPost}
-              className="flex h-13 flex-1 items-center gap-3 rounded-[14px] border border-blue-300/10 bg-[#101650]/90 px-5 shadow-[0_14px_34px_rgba(0,0,0,.18)]"
+              className="flex min-w-0 flex-1 flex-wrap items-center gap-3 rounded-[14px] border border-blue-300/10 bg-[#101650]/90 p-3 shadow-[0_14px_34px_rgba(0,0,0,.18)] sm:h-13 sm:flex-nowrap sm:px-5 sm:py-0"
             >
               <input
                 value={postText}
                 onChange={(e) => setPostText(e.target.value)}
                 placeholder="Ask a question..."
-                className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/55"
+                className="h-8 min-w-[140px] flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/55"
               />
 
               <button
@@ -269,7 +269,7 @@ export default function Community() {
               return (
                 <article
                   key={post.id}
-                  className={`relative overflow-hidden rounded-[18px] border border-white/[0.05] bg-gradient-to-br from-[#151d60]/95 to-[#0b103d]/95 px-5 py-4 shadow-[0_20px_48px_rgba(0,0,0,.34),0_0_22px_rgba(28,48,130,.16)] before:absolute before:inset-y-4 before:left-0 before:w-[3px] before:rounded-r-full before:bg-[#26377f]/80 before:shadow-[0_0_18px_rgba(38,55,127,.45)] ${
+                  className={`relative overflow-hidden rounded-[18px] border border-white/[0.05] bg-gradient-to-br from-[#151d60]/95 to-[#0b103d]/95 px-4 py-4 shadow-[0_20px_48px_rgba(0,0,0,.34),0_0_22px_rgba(28,48,130,.16)] before:absolute before:inset-y-4 before:left-0 before:w-[3px] before:rounded-r-full before:bg-[#26377f]/80 before:shadow-[0_0_18px_rgba(38,55,127,.45)] sm:px-5 ${
                     openMenuId === post.id ? "z-20" : "z-0"
                   }`}
                 >
@@ -421,12 +421,12 @@ export default function Community() {
                     <div className="mt-4 border-t border-white/10 pt-4">
                       <form
                         onSubmit={(event) => addComment(event, post.id)}
-                        className="flex items-center gap-3"
+                        className="flex items-center gap-2 sm:gap-3"
                       >
                         <img
                           src="https://i.pravatar.cc/100?img=5"
                           alt=""
-                          className="h-8 w-8 rounded-full object-cover"
+                          className="hidden h-8 w-8 rounded-full object-cover sm:block"
                         />
                         <input
                           value={commentDrafts[post.id] || ""}
@@ -475,9 +475,7 @@ export default function Community() {
                             </div>
                             <button
                               type="button"
-                              onClick={() =>
-                                deleteComment(post.id, comment.id)
-                              }
+                              onClick={() => deleteComment(post.id, comment.id)}
                               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white/30 transition hover:bg-red-400/10 hover:text-red-300"
                               aria-label="Delete comment"
                             >

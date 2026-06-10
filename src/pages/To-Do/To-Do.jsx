@@ -74,8 +74,8 @@ export default function ToDo() {
       onSearchChange={setSearch}
       searchPlaceholder="Search tasks..."
     >
-      <div className="h-full overflow-y-auto pr-2 pb-6 text-white">
-        <section className="rounded-[28px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_16px_40px_rgba(1,4,25,.24)]">
+      <div className="h-full overflow-y-auto pb-6 text-white lg:pr-2">
+        <section className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_16px_40px_rgba(1,4,25,.24)] sm:rounded-[28px] sm:p-6">
           <div className="mb-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-white/55">Keep your day organized</p>
@@ -89,7 +89,10 @@ export default function ToDo() {
             </div>
           </div>
 
-          <form onSubmit={addTask} className="flex items-center gap-3">
+          <form
+            onSubmit={addTask}
+            className="flex flex-col gap-3 sm:flex-row sm:items-center"
+          >
             <input
               value={newTask}
               onChange={(event) => setNewTask(event.target.value)}
@@ -99,7 +102,7 @@ export default function ToDo() {
             />
             <button
               type="submit"
-              className="flex h-10 items-center gap-2 rounded-[24px] bg-[#5089D6] px-6 font-bold text-white transition-colors hover:bg-[#447bc4]"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-[24px] bg-[#5089D6] px-6 font-bold text-white transition-colors hover:bg-[#447bc4] sm:w-auto"
             >
               <FaPlus />
               Add Task
@@ -107,13 +110,13 @@ export default function ToDo() {
           </form>
         </section>
 
-        <div className="my-6 flex gap-2">
+        <div className="my-5 flex gap-2 overflow-x-auto pb-1 sm:my-6">
           {["all", "active", "completed"].map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setFilter(item)}
-              className={`rounded-[14px] px-5 py-3 text-sm font-semibold capitalize transition ${
+              className={`shrink-0 rounded-[14px] px-5 py-3 text-sm font-semibold capitalize transition ${
                 filter === item
                   ? "bg-blue-300/15 text-[#7db6ff]"
                   : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
@@ -128,7 +131,7 @@ export default function ToDo() {
           {visibleTasks.map((task) => (
             <article
               key={task.id}
-              className="flex items-center gap-4 rounded-[20px] border border-white/5 bg-[#10184c]/70 p-4 transition hover:border-blue-300/20 hover:bg-[#121c58]"
+              className="flex items-center gap-3 rounded-[18px] border border-white/5 bg-[#10184c]/70 p-3 transition hover:border-blue-300/20 hover:bg-[#121c58] sm:gap-4 sm:rounded-[20px] sm:p-4"
             >
               <button
                 type="button"
@@ -167,7 +170,7 @@ export default function ToDo() {
           ))}
 
           {visibleTasks.length === 0 && (
-            <div className="rounded-[28px] border border-dashed border-blue-300/15 bg-white/[0.025] py-16 text-center">
+            <div className="rounded-[22px] border border-dashed border-blue-300/15 bg-white/[0.025] px-4 py-12 text-center sm:rounded-[28px] sm:py-16">
               <FaClipboardCheck className="mx-auto mb-3 text-4xl text-[#5089D6]/75" />
               <p className="font-bold text-white/70">No tasks here yet</p>
               <p className="mt-2 text-sm text-white/35">{emptyMessage}</p>

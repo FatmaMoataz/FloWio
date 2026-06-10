@@ -26,7 +26,7 @@ export default function SettingsTabs() {
           </p>
         </div>
 
-        <div className="flex h-11 w-[300px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
+        <div className="flex h-11 w-full max-w-[300px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
           <FaSearch className="text-xs text-white/40" />
           <input
             placeholder="Search settings..."

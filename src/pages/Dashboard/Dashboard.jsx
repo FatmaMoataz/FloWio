@@ -336,13 +336,13 @@ export default function Dashboard() {
 
   return (
     <MainLayout title="Dashboard">
-      <div className="grid h-full min-h-0 grid-rows-[clamp(78px,10vh,92px)_minmax(0,1fr)] gap-5 xl:gap-6 text-white">
+      <div className="grid min-h-0 gap-5 text-white lg:h-full lg:grid-rows-[clamp(78px,10vh,92px)_minmax(0,1fr)] xl:gap-6">
         {/* KPI CARDS */}
-        <div className="grid grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
           {kpiItems.map((item) => (
             <div
               key={item.label}
-              className="flex min-h-0 items-center gap-4 rounded-[24px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 px-5 shadow-[0_16px_35px_rgba(0,0,0,.24)] transition hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(95,150,255,.18)]"
+              className="flex min-h-[86px] items-center gap-4 rounded-[20px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 px-4 shadow-[0_16px_35px_rgba(0,0,0,.24)] transition hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(95,150,255,.18)] sm:rounded-[24px] sm:px-5"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)]">
                 {item.icon}
@@ -358,7 +358,7 @@ export default function Dashboard() {
         </div>
 
         {/* MAIN GRID */}
-        <div className="grid min-h-0 grid-cols-2 grid-rows-[minmax(250px,0.95fr)_minmax(250px,1fr)] gap-5 xl:gap-6">
+        <div className="grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-2 lg:grid-rows-[minmax(250px,0.95fr)_minmax(250px,1fr)] xl:gap-6">
           {/* PROJECT PROGRESS */}
           <div className={cardClass}>
             <div className="mb-4 flex items-center justify-between">
@@ -368,12 +368,12 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <div className="grid h-[calc(100%-44px)] grid-cols-[190px_1fr] items-center gap-7">
-              <div className="relative mx-auto h-[175px] w-[175px] rounded-full bg-[conic-gradient(#7b5dff_0deg_180deg,#07103a_180deg_186deg,#59d3ff_186deg_258deg,#07103a_258deg_264deg,#d86bff_264deg_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)]">
+            <div className="grid gap-6 sm:grid-cols-[160px_1fr] sm:items-center lg:h-[calc(100%-44px)] lg:grid-cols-[190px_1fr] lg:gap-7">
+              <div className="relative mx-auto h-[150px] w-[150px] rounded-full bg-[conic-gradient(#7b5dff_0deg_180deg,#07103a_180deg_186deg,#59d3ff_186deg_258deg,#07103a_258deg_264deg,#d86bff_264deg_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)] lg:h-[175px] lg:w-[175px]">
                 <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[34px] font-extrabold">50%</span>
+                  <span className="text-[30px] font-extrabold lg:text-[34px]">50%</span>
                   <span className="text-[11px] text-white/65">Completed</span>
                 </div>
               </div>
@@ -386,7 +386,7 @@ export default function Dashboard() {
                 ].map(([label, value, color]) => (
                   <div key={label}>
                     <div className="mb-2 flex items-center justify-between text-[12px]">
-                      <div className="flex items-center gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
                         <span
                           className="h-3 w-3 rounded-full"
                           style={{ backgroundColor: color }}
@@ -415,7 +415,7 @@ export default function Dashboard() {
               <FaChartBar className="text-[#78aaff]" />
             </div>
 
-            <div className="relative mx-auto h-[clamp(156px,20vh,205px)] w-[88%] max-w-[620px]">
+            <div className="relative mx-auto h-[180px] w-full max-w-[620px] sm:w-[88%] lg:h-[clamp(156px,20vh,205px)]">
               {["18%", "42%", "66%", "90%"].map((top) => (
                 <div
                   key={top}
@@ -426,7 +426,7 @@ export default function Dashboard() {
 
               <div className="absolute inset-0 flex items-end justify-around pb-6">
                 {taskBarData.map(([name, value]) => (
-                  <div key={name} className="flex flex-col items-center">
+                  <div key={name} className="flex min-w-0 flex-col items-center">
                     <div className="relative flex h-[clamp(98px,13vh,135px)] w-[clamp(30px,3.4vw,38px)] items-end rounded-[14px] bg-white/10 p-[4px]">
                       <div
                         style={{ height: `${value}%` }}

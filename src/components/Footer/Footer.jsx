@@ -11,11 +11,11 @@ import logo from "../../assets/logo.svg";
 
 export default function Footer() {
   return (
-    <footer className="relative mx-auto mb-8 mt-16 w-[88vw] overflow-hidden rounded-[32px] border border-blue-300/10 bg-[radial-gradient(circle_at_top_right,rgba(110,181,255,.10),transparent_35%),linear-gradient(180deg,#09103a,#060b28)] shadow-[0_0_45px_rgba(25,40,160,.18)]">
+    <footer className="relative mx-auto mb-4 mt-8 w-full overflow-hidden rounded-[24px] border border-blue-300/10 bg-[radial-gradient(circle_at_top_right,rgba(110,181,255,.10),transparent_35%),linear-gradient(180deg,#09103a,#060b28)] shadow-[0_0_45px_rgba(25,40,160,.18)] sm:mb-6 sm:mt-10 sm:rounded-[28px] lg:mb-8 lg:mt-16 lg:w-[88vw] lg:rounded-[32px]">
       <div className="absolute -left-20 top-0 h-60 w-60 rounded-full bg-blue-500/10 blur-3xl" />
       <div className="absolute -right-20 bottom-0 h-60 w-60 rounded-full bg-indigo-500/10 blur-3xl" />
 
-      <div className="relative grid grid-cols-[1.3fr_1fr_.9fr] gap-12 px-10 py-9 text-white">
+      <div className="relative grid grid-cols-1 gap-8 px-5 py-7 text-white sm:grid-cols-2 sm:px-7 lg:grid-cols-[1.3fr_1fr_.9fr] lg:gap-12 lg:px-10 lg:py-9">
         <div>
           <div className="mb-5 flex items-center gap-3">
          <img
@@ -92,8 +92,8 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="relative border-t border-white/5 px-10 py-4">
-        <div className="flex items-center justify-between text-[12px] text-white/40">
+      <div className="relative border-t border-white/5 px-5 py-4 sm:px-7 lg:px-10">
+        <div className="flex flex-col gap-3 text-[12px] text-white/40 sm:flex-row sm:items-center sm:justify-between">
           <span>© 2026 Flowio. All rights reserved.</span>
 
           <div className="flex gap-5">

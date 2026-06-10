@@ -204,9 +204,9 @@ export default function Chats() {
 
   return (
     <MainLayout title="Chats">
-      <div className="grid h-full min-h-0 grid-cols-[300px_1fr] gap-6 text-white">
+      <div className="grid min-h-0 grid-cols-1 gap-4 text-white lg:h-full lg:grid-cols-[300px_1fr] lg:gap-6">
         {/* LEFT PANEL */}
-        <div className="min-h-0 overflow-y-auto rounded-[28px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 p-5 shadow-[0_22px_55px_rgba(0,0,0,.30)]">
+        <div className="max-h-[420px] min-h-0 overflow-y-auto rounded-[22px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 p-4 shadow-[0_22px_55px_rgba(0,0,0,.30)] sm:rounded-[28px] sm:p-5 lg:max-h-none">
           <div className="mb-5 flex items-center justify-between">
             <h3 className="text-[17px] font-bold tracking-[-0.2px]">Messages</h3>
             <div className="relative">
@@ -232,7 +232,7 @@ export default function Chats() {
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 shadow-[0_22px_55px_rgba(0,0,0,.30)]">
+        <div className="flex min-h-[520px] flex-col overflow-hidden rounded-[22px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 shadow-[0_22px_55px_rgba(0,0,0,.30)] sm:rounded-[28px] lg:h-full lg:min-h-0">
           {activeChat ? (
             <>
               <div className="relative flex shrink-0 items-center justify-between border-b border-white/10 px-6 py-4">
@@ -257,7 +257,7 @@ export default function Chats() {
                 {messages.map((msg, index) => (
                   <div key={index} className={`flex items-end gap-3 ${msg.from === "me" ? "justify-end" : "justify-start"}`}>
                     {msg.from === "other" && <Avatar icon={activeChat.icon} online={activeChat.online} color={activeChat.color} small />}
-                    <div className={`max-w-[430px] ${msg.from === "me" ? "text-right" : "text-left"}`}>
+                    <div className={`max-w-[78%] sm:max-w-[430px] ${msg.from === "me" ? "text-right" : "text-left"}`}>
                       <div className={`rounded-[22px] px-5 py-3 text-[12px] leading-5 shadow-[0_12px_28px_rgba(0,0,0,.18)] ${msg.from === "me" ? "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white" : "bg-white text-[#0c123f]"}`}>
                         <p>{msg.text}</p>
                       </div>

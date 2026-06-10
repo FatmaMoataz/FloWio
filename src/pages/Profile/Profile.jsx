@@ -142,7 +142,7 @@ export default function Profile() {
 
   return (
     <MainLayout title="Profile">
-      <div className="grid h-full min-h-0 grid-cols-[1fr_300px] gap-6 text-white">
+      <div className="grid min-h-0 grid-cols-1 gap-5 text-white lg:h-full lg:grid-cols-[1fr_300px] lg:gap-6">
         <div className="grid min-h-0 grid-rows-[280px_1fr] gap-6 overflow-hidden">
           
           {/* PROJECTS SECTION */}
@@ -154,7 +154,7 @@ export default function Profile() {
               </span>
             </div>
 
-            <div className="grid h-[calc(100%-38px)] grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:h-[calc(100%-38px)]">
               {loadingProjects ? (
                 <div className="col-span-2 flex items-center justify-center text-sm text-cyan-400 animate-pulse">
                   Loading active workspace projects...

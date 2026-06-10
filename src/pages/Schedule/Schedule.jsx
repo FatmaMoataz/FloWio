@@ -131,7 +131,7 @@ export default function Schedule() {
 
   return (
     <MainLayout>
-      <div className="h-full min-h-0 overflow-hidden text-white">
+      <div className="min-h-0 text-white lg:h-full lg:overflow-hidden">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3 text-sm">
            <button
@@ -156,7 +156,7 @@ export default function Schedule() {
           </button>
         </div>
 
-        <div className="grid h-[calc(100%-55px)] grid-cols-[1fr_1.18fr] gap-6">
+        <div className="grid gap-5 lg:h-[calc(100%-55px)] lg:grid-cols-[1fr_1.18fr] lg:gap-6">
           {/* LEFT CARD */}
           <div className="rounded-[34px] border border-blue-300/10 bg-gradient-to-br from-[#151e66]/95 to-[#090d34]/95 p-6 shadow-[0_25px_70px_rgba(0,0,0,.35)]">
             <div className="mb-5 flex items-center justify-between">
@@ -391,7 +391,7 @@ export default function Schedule() {
               </div>
             </div>
 
-            <div className="grid grid-cols-[0.9fr_1.25fr] gap-6">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-[0.9fr_1.25fr] sm:gap-6">
               <div className="flex min-h-[205px] flex-col justify-between rounded-[30px] border border-blue-300/10 bg-[#111b63]/95 p-6 shadow-[0_22px_50px_rgba(0,0,0,.28)] transition hover:-translate-y-1">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[15px] font-bold">Tasks Late</h3>

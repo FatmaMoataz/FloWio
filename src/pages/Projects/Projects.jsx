@@ -134,7 +134,7 @@ export default function Projects() {
   return (
     <MainLayout title="Projects">
       {/* HEADER SECTION WITH CREATE BUTTON */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">Company Workspace</h2>
           <p className="text-xs text-white/50 mt-1">
@@ -143,7 +143,7 @@ export default function Projects() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-indigo-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:-translate-y-0.5 hover:shadow-indigo-500/30 active:translate-y-0"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-indigo-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:-translate-y-0.5 hover:shadow-indigo-500/30 active:translate-y-0 sm:w-auto"
         >
           <FaPlus className="text-xs" /> Create New Project
         </button>
@@ -183,7 +183,7 @@ export default function Projects() {
 
       {/* DATA LIST STATE */}
       {!loading && !error && projects.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-white">
+        <div className="grid grid-cols-1 gap-4 text-white sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => {
             const progressValue = project.progress !== undefined ? project.progress : 0;
             const progressString = `${progressValue}%`;
@@ -192,7 +192,7 @@ export default function Projects() {
             return (
               <div
                 key={project._id || project.id}
-                className="rounded-[24px] bg-[#111b63]/95 p-6 shadow-lg border border-white/5 hover:border-white/10 transition-all duration-300 hover:-translate-y-1"
+                className="rounded-[20px] border border-white/5 bg-[#111b63]/95 p-4 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-white/10 sm:rounded-[24px] sm:p-6"
               >
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-b from-[#f6c14f] to-[#ff9f43] text-xl shadow-[0_4px_15px_rgba(246,193,79,0.2)]">
                   {getProjectIcon(projectTitle)}

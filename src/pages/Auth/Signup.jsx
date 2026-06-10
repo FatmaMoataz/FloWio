@@ -193,8 +193,8 @@ const handleSubmit = async (e) => {
   );
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_left,rgba(0,40,170,.48),transparent_35%),linear-gradient(90deg,#02030f,#07144a_55%,#05060f)] flex items-center justify-center p-8 text-white">
-      <div className="w-115 rounded-4xl bg-[#081142]/90 border border-blue-300/15 p-8 shadow-[0_0_60px_rgba(30,60,180,.25)]">
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_left,rgba(0,40,170,.48),transparent_35%),linear-gradient(90deg,#02030f,#07144a_55%,#05060f)] p-3 text-white sm:p-6 lg:p-8">
+      <div className="w-full max-w-[460px] rounded-3xl border border-blue-300/15 bg-[#081142]/90 p-5 shadow-[0_0_60px_rgba(30,60,180,.25)] sm:rounded-4xl sm:p-8">
         <div className="flex items-center justify-center gap-3 mb-4">
           <img
             src={logo}
@@ -202,7 +202,7 @@ const handleSubmit = async (e) => {
             className="w-14 h-14 rounded-2xl object-cover"
           />
 
-          <h1 className="text-5xl font-extrabold bg-linear-to-b from-[#4F58AF] to-[#64CFFF] bg-clip-text text-transparent">
+          <h1 className="bg-linear-to-b from-[#4F58AF] to-[#64CFFF] bg-clip-text text-4xl font-extrabold text-transparent sm:text-5xl">
             Flowio
           </h1>
         </div>
@@ -333,8 +333,8 @@ const handleSubmit = async (e) => {
       </div>
 
       {showGooglePopup && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="w-105 rounded-[26px] bg-[#0b1246] border border-blue-300/15 p-8 text-center shadow-[0_0_40px_rgba(70,120,255,.3)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-[420px] rounded-[26px] border border-blue-300/15 bg-[#0b1246] p-5 text-center shadow-[0_0_40px_rgba(70,120,255,.3)] sm:p-8">
             <h3 className="text-2xl font-bold mb-2">Sign in with Google</h3>
 
             <p className="text-sm text-white/65 mb-5">

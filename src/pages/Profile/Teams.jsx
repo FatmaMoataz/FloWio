@@ -319,7 +319,7 @@ export default function Teams() {
       {/* Toast container configuration injection */}
       <ToastContainer position="top-right" autoClose={3000} theme="dark" />
       
-      <div className="h-full min-h-0 overflow-hidden text-white">
+      <div className="min-h-0 text-white lg:h-full lg:overflow-hidden">
         
         {/* ── Header Section ──────────────────────────────────────── */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
@@ -338,7 +338,7 @@ export default function Teams() {
               <FaPlus /> New Team
             </button>
 
-            <div className="flex h-11 w-[260px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
+            <div className="flex h-11 w-full max-w-[260px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
               <FaSearch className="text-xs text-white/40" />
               <input
                 value={search}
@@ -354,14 +354,14 @@ export default function Teams() {
         {loadingTeams ? (
           <div className="flex h-40 items-center justify-center text-white/65">Loading teams and members...</div>
         ) : (
-          <div className="flex h-[calc(100%-60px)] gap-6 overflow-x-auto overflow-y-hidden pb-4 pr-2">
+          <div className="flex gap-4 overflow-x-auto pb-4 lg:h-[calc(100%-60px)] lg:gap-6 lg:overflow-y-hidden lg:pr-2">
             {visibleTeams.map((team) => {
               const idx = teams.findIndex((t) => t._id === team._id);
 
               return (
                 <div
                   key={team._id}
-                  className="flex h-full min-w-[370px] max-w-[370px] flex-col overflow-hidden rounded-[30px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 p-5 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(95,150,255,.18)]"
+                  className="flex min-w-[min(88vw,370px)] max-w-[370px] flex-col overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 p-4 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(95,150,255,.18)] sm:rounded-[30px] sm:p-5 lg:h-full lg:min-w-[370px]"
                 >
                   <div className="relative mb-4 flex shrink-0 items-center justify-between">
                     <div className="min-w-0">
@@ -472,7 +472,7 @@ export default function Teams() {
         {/* ── Create New Team Modal ───────────────────────────────── */}
         {showCreateModal && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="w-[420px] rounded-[24px] border border-white/10 bg-[#0d1442] p-6 shadow-2xl">
+            <div className="w-full max-w-[420px] rounded-[24px] border border-white/10 bg-[#0d1442] p-5 shadow-2xl sm:p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white">Create New Team</h3>
                 <button onClick={() => setShowCreateModal(false)} className="text-white/45 hover:text-white"><FaTimes /></button>
@@ -497,7 +497,7 @@ export default function Teams() {
         {/* ── Add Team Member Modal ────────────────────────────────── */}
         {addPanel !== null && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/65 backdrop-blur-md">
-            <div className="w-[420px] rounded-[24px] border border-white/10 bg-[#0d1442] p-6 shadow-2xl">
+            <div className="w-full max-w-[420px] rounded-[24px] border border-white/10 bg-[#0d1442] p-5 shadow-2xl sm:p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-white">Add Team Member</h3>

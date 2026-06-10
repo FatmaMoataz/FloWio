@@ -180,7 +180,7 @@ export default function RecentActivity() {
 
   return (
     <MainLayout>
-      <div className="h-full min-h-0 overflow-hidden text-white">
+      <div className="min-h-0 text-white lg:h-full lg:overflow-hidden">
         {/* PAGE HEADER */}
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -199,7 +199,7 @@ export default function RecentActivity() {
             </h2>
           </div>
 
-          <div className="flex h-11 w-[310px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
+          <div className="flex h-11 w-full max-w-[310px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
             <FaSearch className="text-xs text-white/40" />
             <input
               value={search}
@@ -211,7 +211,7 @@ export default function RecentActivity() {
         </div>
 
         {/* CONTENT */}
-        <div className={`${cardClass} flex h-[calc(100%-58px)] flex-col p-7`}>
+        <div className={`${cardClass} flex flex-col p-4 sm:p-7 lg:h-[calc(100%-58px)]`}>
           <div className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="pointer-events-none absolute -right-16 bottom-0 h-44 w-44 rounded-full bg-purple-500/10 blur-3xl" />
 
@@ -285,7 +285,7 @@ export default function RecentActivity() {
               filteredItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`mb-4 grid min-h-[78px] grid-cols-[34px_48px_1fr_110px_110px] items-center gap-5 rounded-[24px] border px-5 py-3 shadow-[0_12px_28px_rgba(0,0,0,.20)] transition-all duration-300 hover:-translate-y-[2px] ${
+                  className={`mb-4 grid min-h-[78px] grid-cols-[34px_44px_1fr] items-center gap-3 rounded-[20px] border px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,.20)] transition-all duration-300 hover:-translate-y-[2px] sm:grid-cols-[34px_48px_1fr_110px_110px] sm:gap-5 sm:rounded-[24px] sm:px-5 ${
                     item.checked
                       ? "border-blue-300/25 bg-gradient-to-r from-[#1c2a87]/95 to-[#141f69]/95"
                       : "border-white/5 bg-[#11194c]/92 hover:bg-[#162061]"

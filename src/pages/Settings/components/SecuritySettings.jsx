@@ -271,7 +271,7 @@ ${sessions
         </div>
       )}
 
-      <div className="grid grid-cols-[1.15fr_.85fr] gap-6">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_.85fr] lg:gap-6">
         <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
           <div className="mb-5 flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-[15px] bg-blue-400/15 text-[#78aaff]">

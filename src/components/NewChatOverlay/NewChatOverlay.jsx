@@ -66,8 +66,8 @@ export default function NewChatOverlay({ onClose, onCreate }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 backdrop-blur-sm">
-      <div className="w-[430px] rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(110,181,255,.18),transparent_35%),linear-gradient(180deg,rgba(18,24,76,.98),rgba(8,13,44,.98))] p-5 text-white shadow-[0_25px_80px_rgba(0,0,0,.65)]">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-[430px] rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(110,181,255,.18),transparent_35%),linear-gradient(180deg,rgba(18,24,76,.98),rgba(8,13,44,.98))] p-4 text-white shadow-[0_25px_80px_rgba(0,0,0,.65)] sm:rounded-[28px] sm:p-5">
         
         <div className="mb-5 flex items-center justify-between">
           <div>

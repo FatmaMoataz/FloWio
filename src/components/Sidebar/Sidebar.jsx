@@ -48,18 +48,28 @@ export default function Sidebar() {
   return (
     <aside
       className="
-      w-[92px]
-      h-full
+      w-full
+      h-auto
       shrink-0
-      rounded-[28px]
+      rounded-[20px]
       bg-[#0f1437]/90
       border
       border-white/5
       flex
-      flex-col
+      flex-row
       items-center
       justify-between
-      py-5
+      gap-2
+      overflow-x-auto
+      px-3
+      py-3
+      lg:h-full
+      lg:w-[92px]
+      lg:flex-col
+      lg:overflow-visible
+      lg:rounded-[28px]
+      lg:px-0
+      lg:py-5
       "
     >
       {/* LOGO */}
@@ -67,9 +77,9 @@ export default function Sidebar() {
       <NavLink
         to="/dashboard"
         className="
-        w-14
-        h-14
-        rounded-[18px]
+        w-11
+        h-11
+        rounded-[14px]
         overflow-hidden
         bg-[#05091f]
         border
@@ -78,6 +88,9 @@ export default function Sidebar() {
         flex
         items-center
         justify-center
+        lg:h-14
+        lg:w-14
+        lg:rounded-[18px]
         "
       >
         <img
@@ -89,7 +102,7 @@ export default function Sidebar() {
 
       {/* NAVIGATION */}
 
-      <nav className="flex flex-col gap-7">
+      <nav className="flex flex-1 items-center justify-center gap-1 sm:gap-2 lg:flex-col lg:gap-7">
         {links.map((link) => (
           <NavLink
             key={link.to}
@@ -97,15 +110,22 @@ export default function Sidebar() {
             title={link.label}
             className={({ isActive }) =>
               `
-              w-12
-              h-12
-              rounded-[16px]
+              w-10
+              h-10
+              shrink-0
+              rounded-[13px]
               flex
               items-center
               justify-center
-              text-[20px]
+              text-[17px]
               transition-all
               duration-300
+              sm:w-11
+              sm:h-11
+              lg:w-12
+              lg:h-12
+              lg:rounded-[16px]
+              lg:text-[20px]
               ${
                 isActive
                   ? "bg-blue-300/15 text-[#7db6ff] shadow-[0_0_20px_rgba(110,181,255,.25)] scale-105"
@@ -126,15 +146,22 @@ export default function Sidebar() {
         title="Settings"
         className={({ isActive }) =>
           `
-          w-12
-          h-12
-          rounded-[16px]
+          w-10
+          h-10
+          shrink-0
+          rounded-[13px]
           flex
           items-center
           justify-center
-          text-[20px]
+          text-[17px]
           transition-all
           duration-300
+          sm:w-11
+          sm:h-11
+          lg:w-12
+          lg:h-12
+          lg:rounded-[16px]
+          lg:text-[20px]
           ${
             isActive
               ? "bg-blue-300/15 text-[#7db6ff] shadow-[0_0_20px_rgba(110,181,255,.25)] scale-105"

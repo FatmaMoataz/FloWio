@@ -171,7 +171,7 @@ export default function Meetings() {
 
   return (
     <MainLayout>
-      <div className="h-full min-h-0 overflow-hidden text-white">
+      <div className="min-h-0 text-white lg:h-full lg:overflow-hidden">
         {!inMeeting ? (
           /* ─── شاشة الدخول ─── */
           <div className="grid h-full place-items-center">
@@ -183,7 +183,7 @@ export default function Meetings() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                 <button
                   onClick={startMeeting}
                   className="group rounded-[26px] border border-blue-300/10 bg-[#10184c]/80 p-6 text-left transition hover:-translate-y-1 hover:bg-[#151f62]"
@@ -236,7 +236,7 @@ export default function Meetings() {
             </div>
 
             {/* الـ Grid الأساسي */}
-            <div className="grid min-h-0 flex-1 grid-cols-[1fr_330px] gap-6">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[1fr_330px] xl:gap-6">
               
               {/* العمود الأيسر: مساحة الـ Jitsi الكاملة + أزرار التحكم */}
               <div className="flex min-h-0 flex-col">
@@ -356,7 +356,7 @@ export default function Meetings() {
             {/* Modal نهاية الاجتماع والأرشفة */}
             {endModal && (
               <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/65 backdrop-blur-md">
-                <div className="w-[390px] rounded-[28px] bg-gradient-to-b from-[#151f68] to-[#0a113d] p-7 text-center">
+                <div className="w-full max-w-[390px] rounded-[24px] bg-gradient-to-b from-[#151f68] to-[#0a113d] p-5 text-center sm:rounded-[28px] sm:p-7">
                   <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15 text-green-400">
                     <FaPhoneSlash />
                   </div>

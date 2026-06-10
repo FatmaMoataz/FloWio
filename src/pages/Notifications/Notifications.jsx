@@ -218,7 +218,7 @@ export default function Notifications() {
           
           {/* TOP TOOLS */}
           <div className="mb-5 flex items-center justify-between gap-5">
-            <div className="flex h-11 w-[360px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
+            <div className="flex h-11 w-full max-w-[360px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
               <FaSearch className="text-xs text-white/40" />
               <input
                 value={search}
@@ -364,7 +364,7 @@ export default function Notifications() {
                         return (
                           <div
                             key={item.id}
-                            className={`grid min-h-18.5 grid-cols-[28px_46px_1fr_110px_95px] items-center gap-4 rounded-[22px] border px-4 py-3 transition-all duration-300 ${
+                            className={`grid min-h-18.5 grid-cols-[28px_40px_1fr] items-center gap-3 rounded-[18px] border px-3 py-3 transition-all duration-300 sm:grid-cols-[28px_46px_1fr_110px_95px] sm:gap-4 sm:rounded-[22px] sm:px-4 ${
                               isSelected
                                 ? "border-blue-300/30 bg-gradient-to-r from-[#1c2a87]/95 to-[#141f69]/95 shadow-[0_0_22px_rgba(95,150,255,.22)]"
                                 : item.type === "welcome"
