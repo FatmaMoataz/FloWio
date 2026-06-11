@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import MainLayout from "../../layout/MainLayout";
-import { jwtDecode } from "jwt-decode";
 import {
   FaLaptopCode,
   FaRobot,
@@ -10,51 +9,49 @@ import {
   FaTimes,
 } from "react-icons/fa";
 
+// 1. بيانات استاتيكية (Static Data) كعينة للعرض
+const INITIAL_PROJECTS = [
+  {
+    _id: "1",
+    name: "E-Commerce Web App",
+    description: "Developing a fully responsive e-commerce platform with Next.js and Tailwind CSS.",
+    progress: 75,
+  },
+  {
+    _id: "2",
+    name: "AI Analytics Bot",
+    description: "An automated Telegram bot that parses company analytics and gives daily insights.",
+    progress: 40,
+  },
+  {
+    _id: "3",
+    name: "Mobile App Design",
+    description: "Figma UI/UX prototyping for the upcoming cross-platform delivery application.",
+    progress: 100,
+  },
+  {
+    _id: "4",
+    name: "DevOps Pipeline Automation",
+    description: "Setting up CI/CD workflows using GitHub Actions and AWS deployments.",
+    progress: 15,
+  },
+];
+
 export default function Projects() {
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // استخدام البيانات الاستاتيكية في الـ State مباشرة
+  const [projects, setProjects] = useState(INITIAL_PROJECTS);
+  
+  // حالات التحميل والخطأ تم ضبطها كـ false لأن البيانات جاهزة محلياً
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Modal and Form States
+  // حالات الـ Modal والـ Form
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newProject, setNewProject] = useState({ name: "", description: "" });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  const tabs = [
-    { key: "all", label: "All Projects" },
-    { key: "active", label: "Active" },
-    { key: "completed", label: "Completed" },
-  ];
-
-  const cardAccents = [
-    {
-      icon: "text-[#ffa723] bg-[#ffa723]/10 ring-[#ffa723]/25",
-      bar: "bg-[#ffa723]",
-      dot: "bg-[#ffa723]",
-      text: "#ffa723",
-    },
-    {
-      icon: "text-[#58a1ff] bg-[#58a1ff]/10 ring-[#58a1ff]/25",
-      bar: "bg-[#4f8dff]",
-      dot: "bg-[#58a1ff]",
-      text: "#58a1ff",
-    },
-    {
-      icon: "text-[#a47cff] bg-[#a47cff]/10 ring-[#a47cff]/25",
-      bar: "bg-[#a47cff]",
-      dot: "bg-[#a47cff]",
-      text: "#a47cff",
-    },
-    {
-      icon: "text-[#24d7ea] bg-[#24d7ea]/10 ring-[#24d7ea]/25",
-      bar: "bg-[#24d7ea]",
-      dot: "bg-[#24d7ea]",
-      text: "#24d7ea",
-    },
-  ];
-
-  // Determine project card icon dynamically based on title keywords
+  // دالة لتحديد الأيقونة ديناميكياً بناءً على اسم المشروع
   const getProjectIcon = (title = "") => {
     const lowerTitle = title.toLowerCase();
     if (lowerTitle.includes("web") || lowerTitle.includes("design"))
@@ -74,75 +71,8 @@ export default function Projects() {
     return <FaProjectDiagram />;
   };
 
-  // Safely extract token and verified target companyId from active session
-  const getCompanySession = () => {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("No token found, please login first.");
-
-    const decoded = jwtDecode(token);
-    let companyId =
-      decoded.companyId || decoded.company || localStorage.getItem("companyId");
-
-    // Dynamic Admin Fallback:
-    // If system-admin lacks a dedicated companyId, it safely uses a reliable active corporate ID
-    // Replace the string value below with a valid company _id copy from your MongoDB cluster if necessary
-    if (!companyId && decoded.role === "system-admin") {
-      companyId = "66391d5bb96fa3ef34a8145b";
-    }
-
-    if (!companyId) {
-      throw new Error("Company ID could not be retrieved from login session.");
-    }
-
-    return { token, companyId };
-  };
-
-  // 1. Fetch current projects linked to company context
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const { token, companyId } = getCompanySession();
-
-        const response = await fetch(
-          `https://flowio-backend.vercel.app/api/projects/company/${companyId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              "x-auth-token": token,
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Server error: ${response.status} - Failed to fetch projects`,
-          );
-        }
-
-        const resData = await response.json();
-
-        // Match with backend controller structure response: res.status(200).json({ success: true, data: projects })
-        const fetchedProjects =
-          resData.data ||
-          (Array.isArray(resData) ? resData : resData.projects || []);
-        setProjects(fetchedProjects);
-      } catch (err) {
-        console.error("Error fetching projects:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjects();
-  }, []);
-
-  // 2. Form submission payload to create a persistent new project record
-  const handleCreateProject = async (e) => {
+  // 2. دالة إضافة مشروع جديد محلياً (Static Add)
+  const handleCreateProject = (e) => {
     e.preventDefault();
     setFormError(null);
 
@@ -151,53 +81,25 @@ export default function Projects() {
       return;
     }
 
-    try {
-      setSubmitting(true);
-      const { token, companyId } = getCompanySession();
+    setSubmitting(true);
 
-      const projectData = {
+    // محاكاة تأخير بسيط كأنها شبكة (اختياري، للواقعية فقط)
+    setTimeout(() => {
+      const createdProject = {
+        _id: String(Date.now()), // توليد ID عشوائي فريد
         name: newProject.name.trim(),
-        description: newProject.description.trim(),
-        companyId: companyId,
+        description: newProject.description.trim() || "Project management and team collaboration workflow.",
+        progress: 0, // أي مشروع جديد يبدأ بـ 0% لتبدو منطقية
       };
 
-      const response = await fetch(
-        "https://flowio-backend.vercel.app/api/projects",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-auth-token": token,
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(projectData),
-        },
-      );
-
-      const resData = await response.json();
-
-      if (!response.ok) {
-        if (resData.errors && Array.isArray(resData.errors)) {
-          throw new Error(resData.errors.join(" | "));
-        }
-        throw new Error(resData.message || `Server error: ${response.status}`);
-      }
-
-      // Extract newly created document safely from payload structure
-      const createdProject = resData.data || resData.project || resData;
-
-      // Unshift item instantly to the existing list state
+      // إضافة المشروع الجديد في أول القائمة
       setProjects((prev) => [createdProject, ...prev]);
+      
+      // إعادة تهيئة الفورم وإغلاق المودال
       setNewProject({ name: "", description: "" });
       setIsModalOpen(false);
-    } catch (err) {
-      console.error("Error creating project:", err);
-      setFormError(
-        err.message || "Something went wrong while creating the project.",
-      );
-    } finally {
       setSubmitting(false);
-    }
+    }, 400); 
   };
 
   return (
@@ -207,7 +109,7 @@ export default function Projects() {
         <div>
           <h2 className="text-xl font-bold text-white">Company Workspace</h2>
           <p className="text-xs text-white/50 mt-1">
-            Manage and track your operational pipeline
+            Manage and track your operational pipeline (Static Demo Mode)
           </p>
         </div>
         <button
