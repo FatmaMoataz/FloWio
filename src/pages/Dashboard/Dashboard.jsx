@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import MainLayout from "../../layout/MainLayout";
 import { Link } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -15,56 +15,58 @@ import {
   FaArrowRight,
   FaChartBar,
   FaRocket,
+  FaChevronDown,
+  FaChevronUp,
+  FaCircle,
+  FaClock,
 } from "react-icons/fa";
 
+// ── Constants ──────────────────────────────────────────────────────────────────
+
 const typeStyle = {
-  system: { icon: <FaBell />, color: "bg-cyan-400/20 text-cyan-300" },
-  welcome: { icon: <FaRocket />, color: "bg-emerald-400/20 text-[#5fffd0] shadow-[0_0_15px_rgba(95,255,208,0.2)]" },
-  task_assigned: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
-  task_updated: { icon: <FaTasks />, color: "bg-purple-400/20 text-purple-300" },
-  comment: { icon: <FaCheckCircle />, color: "bg-emerald-400/20 text-emerald-300" },
-  like: { icon: <FaUsers />, color: "bg-cyan-400/20 text-cyan-300" },
-  mention: { icon: <FaUsers />, color: "bg-purple-400/20 text-purple-300" },
-  polls: { icon: <FaProjectDiagram />, color: "bg-emerald-400/20 text-emerald-300" },
+  system:       { icon: <FaBell />,         color: "bg-cyan-400/20 text-cyan-300" },
+  welcome:      { icon: <FaRocket />,        color: "bg-emerald-400/20 text-[#5fffd0]" },
+  task_assigned:{ icon: <FaTasks />,         color: "bg-purple-400/20 text-purple-300" },
+  task_updated: { icon: <FaTasks />,         color: "bg-purple-400/20 text-purple-300" },
+  comment:      { icon: <FaCheckCircle />,   color: "bg-emerald-400/20 text-emerald-300" },
+  like:         { icon: <FaUsers />,         color: "bg-cyan-400/20 text-cyan-300" },
+  mention:      { icon: <FaUsers />,         color: "bg-purple-400/20 text-purple-300" },
+  polls:        { icon: <FaProjectDiagram />,color: "bg-emerald-400/20 text-emerald-300" },
 };
 
-// Map your exact backend status values → done / in-progress / todo
-const isDone = (s) => ["done", "completed"].includes((s || "").toLowerCase());
-const isInProgress = (s) => ["in-progress", "in_progress", "inprogress", "doing", "review"].includes((s || "").toLowerCase());
+const STATUS = {
+  isDone:       (s) => ["done", "completed"].includes((s || "").toLowerCase()),
+  isInProgress: (s) => ["in-progress", "in_progress", "inprogress", "doing", "review"].includes((s || "").toLowerCase()),
+  isTodo:       (s) => {
+    const v = (s || "").toLowerCase();
+    return !["done","completed","in-progress","in_progress","inprogress","doing","review"].includes(v);
+  },
+};
 
-// Convert status → a 0-100 progress number for the bar chart
 const statusToProgress = (s) => {
-  if (isDone(s)) return 100;
-  if (isInProgress(s)) return 50;
+  if (STATUS.isDone(s)) return 100;
+  if (STATUS.isInProgress(s)) return 50;
   return 0;
 };
 
-// Capitalize the first letter of every word
-const capitalizeWords = (str = "") =>
-  str
-    .trim()
-    .split(/\s+/)
-    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
-    .join(" ");
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
-// Formats role strings: "project-manager" → "Project Manager"
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const capitalizeWords = (str = "") =>
+  str.trim().split(/\s+/).map((w) => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(" ");
+
 const formatRole = (role) => {
   if (!role) return "Team Member";
-  return role
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
+  return role.split(/[-_\s]+/).filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 };
 
-// Extract every assignee id from a task
+/** Extracts all assignee IDs from a task's assignedTo/assignee/assigned_to field */
 const extractAssigneeIds = (task) => {
   const field = task.assignedTo ?? task.assignee ?? task.assigned_to;
   if (!field) return [];
-
-  const items = Array.isArray(field) ? field : [field];
-
-  return items
+  return (Array.isArray(field) ? field : [field])
     .map((item) => {
       if (!item) return null;
       if (typeof item === "object") return String(item._id || item.id || "");
@@ -73,62 +75,204 @@ const extractAssigneeIds = (task) => {
     .filter(Boolean);
 };
 
-// Pull a populated assignee object (name/role) if available
-const extractAssigneeDetails = (task) => {
-  const field = task.assignedTo ?? task.assignee ?? task.assigned_to;
-  if (!field) return [];
-
-  const items = Array.isArray(field) ? field : [field];
-
-  return items
-    .filter((item) => item && typeof item === "object")
-    .map((item) => ({
-      id: String(item._id || item.id || ""),
-      name: item.name,
-      role: item.specialization || item.role || item.role_in_team,
-    }))
-    .filter((d) => d.id);
+/** Returns a display label + color class for a task status */
+const statusBadge = (s) => {
+  if (STATUS.isDone(s))       return { label: "Done",        cls: "bg-emerald-400/20 text-emerald-300" };
+  if (STATUS.isInProgress(s)) return { label: "In Progress", cls: "bg-blue-400/20 text-blue-300" };
+  return                             { label: "To Do",        cls: "bg-white/10 text-white/50" };
 };
 
+const priorityBadge = (p) => {
+  const v = (p || "").toLowerCase();
+  if (v === "high")   return { label: "High",   cls: "text-red-400" };
+  if (v === "medium") return { label: "Med",    cls: "text-amber-400" };
+  if (v === "low")    return { label: "Low",    cls: "text-emerald-400" };
+  return null;
+};
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+/** Collapsible card showing one team member and their to-do tasks */
+function MemberTaskCard({ person }) {
+  const [open, setOpen] = useState(false);
+
+  const todoTasks = (person.tasks || [])
+    .filter((t) => STATUS.isTodo(t.status))
+    .sort((a, b) => (PRIORITY_ORDER[a.priority?.toLowerCase()] ?? 99) - (PRIORITY_ORDER[b.priority?.toLowerCase()] ?? 99));
+
+  const inProgressTasks = (person.tasks || [])
+    .filter((t) => STATUS.isInProgress(t.status));
+
+  const doneTasks = (person.tasks || [])
+    .filter((t) => STATUS.isDone(t.status));
+
+  const { percent, totalTasks, doneCount } = person;
+
+  return (
+    <div className="rounded-[20px] bg-[#10184c]/60 transition hover:bg-[#151f62]">
+      {/* Header row — always visible */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 p-4 text-left"
+      >
+        {/* Avatar */}
+        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
+          {person.name.charAt(0)}
+        </div>
+
+        {/* Name + role */}
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-bold leading-tight">{person.name}</p>
+          <p className="mt-0.5 text-[10px] text-white/45">{person.role}</p>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-3">
+          {person.hasTasks ? (
+            <div className="text-right">
+              <span className="text-[12px] font-bold text-[#78aaff]">{percent}%</span>
+              <p className="text-[9px] text-white/35">{doneCount}/{totalTasks} done</p>
+            </div>
+          ) : (
+            <span className="text-[11px] text-white/25">No tasks</span>
+          )}
+
+          {/* Task count badges */}
+          {todoTasks.length > 0 && (
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
+              {todoTasks.length} to‑do
+            </span>
+          )}
+          {inProgressTasks.length > 0 && (
+            <span className="rounded-full bg-blue-400/20 px-2 py-0.5 text-[10px] text-blue-300">
+              {inProgressTasks.length} active
+            </span>
+          )}
+
+          {/* Chevron */}
+          {person.hasTasks ? (
+            open ? (
+              <FaChevronUp className="shrink-0 text-[10px] text-white/30" />
+            ) : (
+              <FaChevronDown className="shrink-0 text-[10px] text-white/30" />
+            )
+          ) : null}
+        </div>
+      </button>
+
+      {/* Progress bar */}
+      <div className="mx-4 mb-3 h-[5px] rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] transition-all duration-500"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      {/* Expanded task list */}
+      {open && person.hasTasks && (
+        <div className="border-t border-white/5 px-4 pb-4 pt-3">
+          {/* To-Do section */}
+          {todoTasks.length > 0 && (
+            <div className="mb-3">
+              <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/30">
+                <FaCircle className="text-[7px] text-white/20" /> To Do
+              </p>
+              <div className="space-y-1.5">
+                {todoTasks.map((task) => (
+                  <TaskRow key={task._id || task.id} task={task} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* In Progress section */}
+          {inProgressTasks.length > 0 && (
+            <div className="mb-3">
+              <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-400/60">
+                <FaClock className="text-[7px]" /> In Progress
+              </p>
+              <div className="space-y-1.5">
+                {inProgressTasks.map((task) => (
+                  <TaskRow key={task._id || task.id} task={task} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Done section (collapsed summary) */}
+          {doneTasks.length > 0 && (
+            <p className="text-[10px] text-white/25">
+              + {doneTasks.length} completed task{doneTasks.length > 1 ? "s" : ""}
+            </p>
+          )}
+
+          {/* No to-do or in-progress */}
+          {todoTasks.length === 0 && inProgressTasks.length === 0 && (
+            <p className="text-[11px] text-white/30">All tasks completed 🎉</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Single task row inside the expanded member card */
+function TaskRow({ task }) {
+  const sb = statusBadge(task.status);
+  const pb = priorityBadge(task.priority);
+
+  return (
+    <div className="flex items-center gap-2 rounded-[10px] bg-white/5 px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[12px] font-medium text-white/85">
+          {task.title || "Untitled task"}
+        </p>
+        {task.dueDate && (
+          <p className="text-[10px] text-white/30">
+            Due {new Date(task.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}
+          </p>
+        )}
+      </div>
+      {pb && (
+        <span className={`shrink-0 text-[10px] font-bold ${pb.cls}`}>{pb.label}</span>
+      )}
+      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${sb.cls}`}>
+        {sb.label}
+      </span>
+    </div>
+  );
+}
+
+// ── Main Dashboard ─────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
-  const [notifications, setNotifications] = useState([]);
-  const [loadingNotif, setLoadingNotif] = useState(true);
-
-  const [projectStats, setProjectStats] = useState({ total: 0, active: 0 });
-  const [loadingProjects, setLoadingProjects] = useState(true);
-
-  const [teamStats, setTeamStats] = useState({ total: 0, membersCount: 0 });
-  const [loadingTeams, setLoadingTeams] = useState(true);
-
-  const [taskStats, setTaskStats] = useState({ total: 0, pending: 0 });
-  const [loadingTasks, setLoadingTasks] = useState(true);
-
-  const [meetingStats, setMeetingStats] = useState({ total: 0, today: 0 });
-  const [loadingMeetings, setLoadingMeetings] = useState(true);
-
-  const [taskBarData, setTaskBarData] = useState([
-    ["Task 1", 0], ["Task 2", 0], ["Task 3", 0], ["Task 4", 0],
-  ]);
-
-  const [projectProgressStats, setProjectProgressStats] = useState({
-    donePercent: 50,
-    inProgressPercent: 30,
-    toDoPercent: 20,
-  });
-
-  const [teamDiscipline, setTeamDiscipline] = useState([]);
-  const [loadingDiscipline, setLoadingDiscipline] = useState(true);
+  const [notifications,         setNotifications]         = useState([]);
+  const [loadingNotif,          setLoadingNotif]          = useState(true);
+  const [projectStats,          setProjectStats]          = useState({ total: 0, active: 0 });
+  const [loadingProjects,       setLoadingProjects]       = useState(true);
+  const [teamStats,             setTeamStats]             = useState({ total: 0, membersCount: 0 });
+  const [loadingTeams,          setLoadingTeams]          = useState(true);
+  const [taskStats,             setTaskStats]             = useState({ total: 0, pending: 0 });
+  const [loadingTasks,          setLoadingTasks]          = useState(true);
+  const [meetingStats,          setMeetingStats]          = useState({ total: 0, today: 0 });
+  const [loadingMeetings,       setLoadingMeetings]       = useState(true);
+  const [taskBarData,           setTaskBarData]           = useState([["Task 1",0],["Task 2",0],["Task 3",0],["Task 4",0]]);
+  const [projectProgressStats,  setProjectProgressStats]  = useState({ donePercent: 0, inProgressPercent: 0, toDoPercent: 100 });
+  const [teamDiscipline,        setTeamDiscipline]        = useState([]);
+  const [loadingDiscipline,     setLoadingDiscipline]     = useState(true);
 
   const token = localStorage.getItem("token");
 
   useEffect(() => {
     if (!token) return;
 
-    const fetchDashboardData = async () => {
+    const run = async () => {
       try {
-        const decoded = jwtDecode(token);
+        const decoded    = jwtDecode(token);
         const realUserId = decoded._id;
-        let companyId = decoded.companyId || decoded.company || (decoded.user && decoded.user.companyId) || localStorage.getItem("companyId");
+        let companyId    = decoded.companyId || decoded.company ||
+                           (decoded.user && decoded.user.companyId) ||
+                           localStorage.getItem("companyId");
 
         if (!companyId && decoded.role === "system-admin") {
           companyId = "66391d5bb96fa3ef34a8145b";
@@ -136,39 +280,31 @@ export default function Dashboard() {
         }
 
         const headers = {
-          "Content-Type": "application/json",
-          "x-auth-token": token,
+          "Content-Type":  "application/json",
+          "x-auth-token":  token,
           "Authorization": `Bearer ${token}`,
         };
 
-        // Store all data we collect
+        // ── 1. Projects ──────────────────────────────────────────────────────
         let fetchedProjects = [];
-        let allTasks = [];
-        let teamMembersMap = new Map();
-
-        // 1. Fetch Projects
         if (companyId) {
           setLoadingProjects(true);
           try {
-            const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
-              method: "GET",
-              headers,
-            });
-
-            if (response.ok) {
-              const resData = await response.json();
-              fetchedProjects = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
-              const activeCount = fetchedProjects.filter((p) => (p.progress !== undefined ? p.progress < 100 : true)).length;
-              setProjectStats({ total: fetchedProjects.length, active: activeCount });
+            const r = await fetch(
+              `https://flowio-backend.vercel.app/api/projects/company/${companyId}`,
+              { method: "GET", headers }
+            );
+            if (r.ok) {
+              const d = await r.json();
+              fetchedProjects = d.data || (Array.isArray(d) ? d : d.projects || []);
+              const active = fetchedProjects.filter((p) => (p.progress !== undefined ? p.progress < 100 : true)).length;
+              setProjectStats({ total: fetchedProjects.length, active });
             }
-          } catch (err) {
-            console.error("Error fetching projects:", err);
-          } finally {
-            setLoadingProjects(false);
-          }
+          } catch (e) { console.error("Projects fetch error:", e); }
+          finally { setLoadingProjects(false); }
         }
 
-        // 2. Fetch Meetings
+        // ── 2. Meetings ──────────────────────────────────────────────────────
         if (companyId && fetchedProjects.length > 0) {
           setLoadingMeetings(true);
           try {
@@ -177,53 +313,61 @@ export default function Dashboard() {
               fetchedProjects.map(async (project) => {
                 const pId = project._id || project.id;
                 try {
-                  const meetingsResp = await fetch(`https://flowio-backend.vercel.app/api/meetings/project/${pId}`, { method: "GET", headers });
-                  if (meetingsResp.ok) {
-                    const mData = await meetingsResp.json();
-                    allMeetings = [...allMeetings, ...(mData.data || (Array.isArray(mData) ? mData : []))];
+                  const r = await fetch(
+                    `https://flowio-backend.vercel.app/api/meetings/project/${pId}`,
+                    { method: "GET", headers }
+                  );
+                  if (r.ok) {
+                    const d = await r.json();
+                    allMeetings = [...allMeetings, ...(d.data || (Array.isArray(d) ? d : []))];
                   }
-                } catch (err) {
-                  console.error(`Error fetching meetings for project ${pId}:`, err);
-                }
+                } catch (e) { /* silent */ }
               })
             );
             const todayStr = new Date().toISOString().split("T")[0];
-            const meetingsToday = allMeetings.filter((m) => m.date && m.date.startsWith(todayStr)).length;
-            setMeetingStats({ total: allMeetings.length, today: meetingsToday });
-          } catch (err) {
-            console.error("Error fetching meetings:", err);
-          } finally {
-            setLoadingMeetings(false);
-          }
+            setMeetingStats({
+              total: allMeetings.length,
+              today: allMeetings.filter((m) => m.date?.startsWith(todayStr)).length,
+            });
+          } catch (e) { console.error("Meetings fetch error:", e); }
+          finally { setLoadingMeetings(false); }
+        } else {
+          setLoadingMeetings(false);
         }
 
-        // 3. Fetch Tasks (both personal and project tasks)
+        // ── 3. Tasks (global stats + chart) ─────────────────────────────────
+        //
+        // We collect ALL tasks from every project in one deduplicated array.
+        // This same array is later used to match assignee IDs against personMap.
+        //
         setLoadingTasks(true);
+        let allTasks = [];
         try {
-          // Fetch personal tasks
-          const myTasksResp = await API.get("/api/tasks/my-tasks");
-          const myTasks = myTasksResp.data?.data || [];
-          
-          // Fetch project tasks
+          // My tasks first (always available)
+          const myResp = await API.get("/api/tasks/my-tasks");
+          const myTasks = myResp.data?.data || [];
+
+          // Project-level tasks
           let projectTasks = [];
           if (companyId && fetchedProjects.length > 0) {
             await Promise.all(
               fetchedProjects.map(async (project) => {
                 const pId = project._id || project.id;
                 try {
-                  const tResp = await fetch(`https://flowio-backend.vercel.app/api/projects/${pId}/tasks`, { method: "GET", headers });
-                  if (tResp.ok) {
-                    const tData = await tResp.json();
-                    projectTasks = [...projectTasks, ...(tData.data || [])];
+                  const r = await fetch(
+                    `https://flowio-backend.vercel.app/api/projects/${pId}/tasks`,
+                    { method: "GET", headers }
+                  );
+                  if (r.ok) {
+                    const d = await r.json();
+                    projectTasks = [...projectTasks, ...(d.data || [])];
                   }
-                } catch (e) {
-                  console.error(`Error fetching tasks for project ${pId}:`, e);
-                }
+                } catch (e) { /* silent */ }
               })
             );
           }
 
-          // Deduplicate tasks
+          // Deduplicate by _id / id
           const seen = new Set();
           allTasks = [...myTasks, ...projectTasks].filter((t) => {
             const id = t._id || t.id;
@@ -232,163 +376,176 @@ export default function Dashboard() {
             return true;
           });
 
-          const totalCount = allTasks.length;
-          const pendingCount = allTasks.filter((t) => !isDone(t.status)).length;
-          setTaskStats({ total: totalCount, pending: pendingCount });
+          // KPI
+          const total   = allTasks.length;
+          const pending = allTasks.filter((t) => !STATUS.isDone(t.status)).length;
+          setTaskStats({ total, pending });
 
-          // Donut chart percentages
-          if (totalCount > 0) {
-            const doneCount = allTasks.filter((t) => isDone(t.status)).length;
-            const inProgressCount = allTasks.filter((t) => isInProgress(t.status)).length;
-            const toDoCount = totalCount - doneCount - inProgressCount;
+          // Donut chart data
+          if (total > 0) {
+            const done       = allTasks.filter((t) => STATUS.isDone(t.status)).length;
+            const inProgress = allTasks.filter((t) => STATUS.isInProgress(t.status)).length;
+            const todo       = total - done - inProgress;
             setProjectProgressStats({
-              donePercent: Math.round((doneCount / totalCount) * 100),
-              inProgressPercent: Math.round((inProgressCount / totalCount) * 100),
-              toDoPercent: Math.round((toDoCount / totalCount) * 100),
+              donePercent:       Math.round((done       / total) * 100),
+              inProgressPercent: Math.round((inProgress / total) * 100),
+              toDoPercent:       Math.round((todo       / total) * 100),
             });
           }
 
-          // Bar chart data
-          const chartTasks = allTasks.slice(0, 4);
-          const chartData = chartTasks.map((t) => {
+          // Bar chart (first 4 tasks)
+          const chart = allTasks.slice(0, 4).map((t) => {
             const label = (t.title || "Task").length > 8
               ? t.title.substring(0, 8) + ".."
               : t.title;
             return [label, statusToProgress(t.status)];
           });
-          while (chartData.length < 4) chartData.push([`Task ${chartData.length + 1}`, 0]);
-          setTaskBarData(chartData);
+          while (chart.length < 4) chart.push([`Task ${chart.length + 1}`, 0]);
+          setTaskBarData(chart);
 
-        } catch (err) {
-          console.error("Error fetching tasks:", err);
+        } catch (e) {
+          console.error("Tasks fetch error:", e);
           setTaskStats({ total: 0, pending: 0 });
         } finally {
           setLoadingTasks(false);
         }
 
-        // 4. Fetch Teams and Members, then calculate discipline using allTasks
+        // ── 4. Teams + per-member task discipline ────────────────────────────
+        //
+        // Strategy:
+        //   a) Fetch all teams → collect unique members into personMap
+        //      (keyed by userId string)
+        //   b) For each task in allTasks, call extractAssigneeIds() which
+        //      handles both populated objects { _id, name, ... } and raw strings.
+        //      Match those IDs against personMap and bucket the task onto the person.
+        //   c) Build the discipline list from personMap.
+        //
+        // We do NOT rely on a /api/tasks/user/:id endpoint because that route
+        // does not exist in the current backend.
+        //
         if (companyId) {
           setLoadingTeams(true);
           setLoadingDiscipline(true);
           try {
-            // Fetch teams
-            const teamsResponse = await API.get(`/api/teams/company/${companyId}`);
-            const fetchedTeams = teamsResponse.data?.data || (Array.isArray(teamsResponse.data) ? teamsResponse.data : []);
-            
-            // Map to store member data
-            const memberMap = new Map();
+            const teamsResp = await API.get(`/api/teams/company/${companyId}`);
+            const fetchedTeams = teamsResp.data?.data ||
+              (Array.isArray(teamsResp.data) ? teamsResp.data : []);
+
+            // personMap: userId (string) → { id, name, role, tasks[] }
+            const personMap = new Map();
 
             if (fetchedTeams.length > 0) {
-              // Fetch members for each team
+              // a) Collect members
               await Promise.all(
                 fetchedTeams.map(async (team) => {
                   const teamId = team._id || team.id;
                   if (!teamId) return;
                   try {
-                    const membersResp = await API.get(`/api/teams/${teamId}/members`);
-                    const membersArray = membersResp.data?.data || (Array.isArray(membersResp.data) ? membersResp.data : []);
-                    
-                    membersArray.forEach((member) => {
-                      let userId = null;
+                    const r = await API.get(`/api/teams/${teamId}/members`);
+                    const members = r.data?.data || (Array.isArray(r.data) ? r.data : []);
+
+                    members.forEach((member) => {
+                      // teamMember.service populates userId with { name, email, specialization }
+                      let userId   = null;
                       let userName = "Unknown";
                       let userRole = "Team Member";
-                      
-                      // Handle populated userId object
+
                       if (member.userId && typeof member.userId === "object") {
-                        userId = member.userId._id || member.userId.id;
-                        userName = member.userId.name || userName;
-                        userRole = member.userId.specialization || member.userId.role || member.role_in_team || userRole;
+                        userId   = String(member.userId._id || member.userId.id || "");
+                        userName = member.userId.name || "Unknown";
+                        // specialization > role_in_team > role
+                        userRole = member.userId.specialization ||
+                                   member.role_in_team ||
+                                   member.userId.role ||
+                                   "Team Member";
                       } else if (member.userId) {
-                        userId = member.userId;
-                      } else {
-                        userId = member._id || member.id;
+                        userId = String(member.userId);
+                      } else if (member._id || member.id) {
+                        userId   = String(member._id || member.id);
+                        userName = member.name || "Unknown";
+                        userRole = member.role_in_team || member.role || "Team Member";
                       }
-                      
-                      if (userId) {
-                        userId = String(userId);
-                        if (!memberMap.has(userId)) {
-                          memberMap.set(userId, {
-                            id: userId,
-                            name: userName,
-                            role: userRole,
-                            total: 0,
-                            done: 0,
-                          });
-                        } else {
-                          const existing = memberMap.get(userId);
-                          if (existing.name === "Unknown" && userName !== "Unknown") existing.name = userName;
-                          if ((existing.role === "Team Member" || existing.role === "member") && userRole) existing.role = userRole;
+
+                      if (!userId) return;
+
+                      if (!personMap.has(userId)) {
+                        personMap.set(userId, { id: userId, name: userName, role: userRole, tasks: [] });
+                      } else {
+                        // Enrich existing entry if we now have better data
+                        const existing = personMap.get(userId);
+                        if (existing.name === "Unknown" && userName !== "Unknown") existing.name = userName;
+                        if ((existing.role === "Team Member" || existing.role === "member") &&
+                            userRole && userRole !== "Team Member") {
+                          existing.role = userRole;
                         }
                       }
                     });
-                  } catch (memberErr) {
-                    console.error(`Error fetching members for team ${teamId}:`, memberErr);
+                  } catch (e) {
+                    console.error(`Members fetch error for team ${teamId}:`, e);
                   }
                 })
               );
-              setTeamStats({ total: fetchedTeams.length, membersCount: memberMap.size });
+
+              setTeamStats({ total: fetchedTeams.length, membersCount: personMap.size });
+
+              // b) Distribute tasks to their assignees
+              //    extractAssigneeIds handles both { _id } objects and raw ID strings
+              allTasks.forEach((task) => {
+                const ids = extractAssigneeIds(task);
+                ids.forEach((id) => {
+                  // Some tasks may be assigned to users not on any team we fetched —
+                  // we still track them so their to-do list is correct.
+                  if (!personMap.has(id)) {
+                    // Try to pull name/role from the populated assignedTo field
+                    const field = task.assignedTo ?? task.assignee ?? task.assigned_to;
+                    const items = Array.isArray(field) ? field : [field];
+                    const match = items.find(
+                      (item) => item && typeof item === "object" &&
+                                String(item._id || item.id || "") === id
+                    );
+                    personMap.set(id, {
+                      id,
+                      name: match?.name || "Unknown",
+                      role: match?.specialization || match?.role || "Team Member",
+                      tasks: [],
+                    });
+                  }
+                  personMap.get(id).tasks.push(task);
+                });
+              });
+
+              // c) Build discipline list
+              const disciplineList = Array.from(personMap.values())
+                .map((person) => {
+                  const total     = person.tasks.length;
+                  const doneCount = person.tasks.filter((t) => STATUS.isDone(t.status)).length;
+                  const percent   = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+                  return {
+                    id:        person.id,
+                    name:      capitalizeWords(person.name),
+                    role:      formatRole(person.role),
+                    percent,
+                    totalTasks: total,
+                    doneCount,
+                    hasTasks:  total > 0,
+                    tasks:     person.tasks, // full task objects for the to-do list
+                  };
+                })
+                .sort((a, b) => {
+                  if (a.hasTasks !== b.hasTasks) return b.hasTasks - a.hasTasks;
+                  if (a.percent  !== b.percent)  return b.percent  - a.percent;
+                  return a.name.localeCompare(b.name);
+                });
+
+              setTeamDiscipline(disciplineList);
+
             } else {
               setTeamStats({ total: 0, membersCount: 0 });
+              setTeamDiscipline([]);
             }
 
-            // Calculate task completion for each member using the tasks we already fetched
-            console.log("Calculating discipline with tasks:", allTasks.length);
-            console.log("Member map size:", memberMap.size);
-            
-            allTasks.forEach((task) => {
-              const assigneeIds = extractAssigneeIds(task);
-              console.log(`Task "${task.title}" assignees:`, assigneeIds);
-              
-              if (assigneeIds.length === 0) return;
-
-              const assigneeDetails = extractAssigneeDetails(task);
-              const detailsById = new Map(assigneeDetails.map(d => [d.id, d]));
-
-              assigneeIds.forEach((assigneeId) => {
-                // Add member if not already in map
-                if (!memberMap.has(assigneeId)) {
-                  const details = detailsById.get(assigneeId);
-                  memberMap.set(assigneeId, {
-                    id: assigneeId,
-                    name: details?.name || "Unknown",
-                    role: details?.role || "Team Member",
-                    total: 0,
-                    done: 0,
-                  });
-                }
-                
-                const entry = memberMap.get(assigneeId);
-                entry.total += 1;
-                if (isDone(task.status)) {
-                  entry.done += 1;
-                }
-              });
-            });
-
-            // Log the results for debugging
-            console.log("Member map after tasks:");
-            memberMap.forEach((member, id) => {
-              console.log(`${member.name}: ${member.done}/${member.total} tasks (${member.total > 0 ? Math.round((member.done / member.total) * 100) : 0}%)`);
-            });
-
-            // Format discipline list
-            const disciplineList = Array.from(memberMap.values())
-              .map((member) => ({
-                name: capitalizeWords(member.name),
-                role: formatRole(member.role),
-                percent: member.total > 0 ? Math.round((member.done / member.total) * 100) : 0,
-                taskCount: member.total,
-                doneCount: member.done,
-                hasTasks: member.total > 0,
-              }))
-              .sort((a, b) => (b.hasTasks - a.hasTasks) || b.percent - a.percent || a.name.localeCompare(b.name))
-              .slice(0, 6);
-
-            console.log("Final discipline list:", disciplineList);
-            setTeamDiscipline(disciplineList);
-
-          } catch (err) {
-            console.error("Error fetching teams:", err);
+          } catch (e) {
+            console.error("Teams fetch error:", e);
           } finally {
             setLoadingTeams(false);
             setLoadingDiscipline(false);
@@ -397,44 +554,43 @@ export default function Dashboard() {
           setLoadingDiscipline(false);
         }
 
-        // 5. Fetch Notifications
+        // ── 5. Notifications ─────────────────────────────────────────────────
         if (realUserId) {
           setLoadingNotif(true);
           try {
-            const data = await notificationService.getUserNotifications(realUserId);
+            const data        = await notificationService.getUserNotifications(realUserId);
             const serverNotifs = data?.data || [];
-            const localData = localStorage.getItem("local_notifications");
-            const localNotifs = localData ? JSON.parse(localData) : [];
-            const allNotifs = [...localNotifs, ...serverNotifs];
+            const localData   = localStorage.getItem("local_notifications");
+            const localNotifs  = localData ? JSON.parse(localData) : [];
 
-            const transformed = allNotifs
-              .map((notif) => {
-                const safeType = (notif.type || "system").toLowerCase();
-                const currentStyle = typeStyle[safeType] || typeStyle.system;
+            const transformed = [...localNotifs, ...serverNotifs]
+              .map((n) => {
+                const safeType   = (n.type || "system").toLowerCase();
+                const style      = typeStyle[safeType] || typeStyle.system;
                 return {
-                  id: notif._id || notif.id,
-                  title: notif.title || "No Title",
-                  desc: notif.message || notif.desc || "",
-                  style: currentStyle,
-                  time: notif.createdAt
-                    ? new Date(notif.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  id:           n._id || n.id,
+                  title:        n.title || "No Title",
+                  desc:         n.message || n.desc || "",
+                  style,
+                  time:         n.createdAt
+                    ? new Date(n.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                     : "Just Now",
-                  rawCreatedAt: notif.createdAt,
+                  rawCreatedAt: n.createdAt,
                 };
               })
               .sort((a, b) => new Date(b.rawCreatedAt) - new Date(a.rawCreatedAt))
               .slice(0, 4);
 
             setNotifications(transformed);
-          } catch (err) {
-            console.error("Error fetching notifications:", err);
+          } catch (e) {
+            console.error("Notifications fetch error:", e);
           } finally {
             setLoadingNotif(false);
           }
         }
 
-      } catch (error) {
-        console.error("Dashboard init error:", error);
+      } catch (err) {
+        console.error("Dashboard init error:", err);
         setLoadingNotif(false);
         setLoadingProjects(false);
         setLoadingTeams(false);
@@ -444,23 +600,26 @@ export default function Dashboard() {
       }
     };
 
-    fetchDashboardData();
+    run();
   }, [token]);
 
+  // ── Shared card styles ─────────────────────────────────────────────────────
   const cardClass =
     "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-5 xl:p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
 
   const kpiItems = [
-    { icon: <FaProjectDiagram />, label: "Projects", value: loadingProjects ? "..." : String(projectStats.total), sub: `${projectStats.active} active` },
-    { icon: <FaTasks />, label: "Tasks", value: loadingTasks ? "..." : String(taskStats.total), sub: `${taskStats.pending} pending` },
-    { icon: <FaCalendarAlt />, label: "Meetings", value: loadingMeetings ? "..." : String(meetingStats.total), sub: `${meetingStats.today} today` },
-    { icon: <FaUsers />, label: "Teams", value: loadingTeams ? "..." : String(teamStats.total), sub: `${teamStats.membersCount} members` },
+    { icon: <FaProjectDiagram />, label: "Projects",     value: loadingProjects ? "…" : String(projectStats.total),    sub: `${projectStats.active} active` },
+    { icon: <FaTasks />,          label: "Tasks",        value: loadingTasks    ? "…" : String(taskStats.total),       sub: `${taskStats.pending} pending` },
+    { icon: <FaCalendarAlt />,    label: "Meetings",     value: loadingMeetings ? "…" : String(meetingStats.total),    sub: `${meetingStats.today} today` },
+    { icon: <FaUsers />,          label: "Team Members", value: loadingTeams    ? "…" : String(teamStats.membersCount),sub: `${teamStats.total} teams` },
   ];
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <MainLayout title="Dashboard">
       <div className="grid min-h-0 gap-5 text-white lg:h-full lg:grid-rows-[clamp(78px,10vh,92px)_minmax(0,1fr)] xl:gap-6">
-        {/* KPI CARDS */}
+
+        {/* ── KPI CARDS ─────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
           {kpiItems.map((item) => (
             <div
@@ -479,8 +638,9 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* MAIN GRID */}
+        {/* ── MAIN GRID ──────────────────────────────────────────────────────── */}
         <div className="grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-2 lg:grid-rows-[minmax(250px,0.95fr)_minmax(250px,1fr)] xl:gap-6">
+
           {/* PROJECT PROGRESS */}
           <div className={cardClass}>
             <div className="mb-4 flex items-center justify-between">
@@ -491,19 +651,28 @@ export default function Dashboard() {
             </div>
 
             <div className="grid gap-6 sm:grid-cols-[160px_1fr] sm:items-center lg:h-[calc(100%-44px)] lg:grid-cols-[190px_1fr] lg:gap-7">
-              <div className="relative mx-auto h-[150px] w-[150px] rounded-full bg-[conic-gradient(#7b5dff_0deg_180deg,#07103a_180deg_186deg,#59d3ff_186deg_258deg,#07103a_258deg_264deg,#d86bff_264deg_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)] lg:h-[175px] lg:w-[175px]">
+              {/* Donut */}
+              <div className="relative mx-auto h-[150px] w-[150px] rounded-full bg-[conic-gradient(#7b5dff_0deg_var(--done)_,#07103a_var(--done)_calc(var(--done)+6deg),#59d3ff_calc(var(--done)+6deg)_calc(var(--done)+6deg+var(--inp)),#07103a_calc(var(--done)+6deg+var(--inp))_calc(var(--done)+12deg+var(--inp)),#d86bff_calc(var(--done)+12deg+var(--inp))_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)] lg:h-[175px] lg:w-[175px]"
+                style={{
+                  "--done": `${projectProgressStats.donePercent * 3.6}deg`,
+                  "--inp":  `${projectProgressStats.inProgressPercent * 3.6}deg`,
+                }}
+              >
                 <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[30px] font-extrabold lg:text-[34px]">{projectProgressStats.donePercent}%</span>
+                  <span className="text-[30px] font-extrabold lg:text-[34px]">
+                    {projectProgressStats.donePercent}%
+                  </span>
                   <span className="text-[11px] text-white/65">Completed</span>
                 </div>
               </div>
 
+              {/* Bars */}
               <div className="space-y-4">
                 {[
-                  ["Done", `${projectProgressStats.donePercent}%`, "#7b5dff"],
+                  ["Done",        `${projectProgressStats.donePercent}%`,       "#7b5dff"],
                   ["In Progress", `${projectProgressStats.inProgressPercent}%`, "#d86bff"],
-                  ["To Do", `${projectProgressStats.toDoPercent}%`, "#59d3ff"],
+                  ["To Do",       `${projectProgressStats.toDoPercent}%`,       "#59d3ff"],
                 ].map(([label, value, color]) => (
                   <div key={label}>
                     <div className="mb-2 flex items-center justify-between text-[12px]">
@@ -525,7 +694,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TASKS PROGRESS */}
+          {/* TASKS BAR CHART */}
           <div className={cardClass}>
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-[17px] font-bold">Tasks Progress</h3>
@@ -536,7 +705,6 @@ export default function Dashboard() {
               {["18%", "42%", "66%", "90%"].map((top) => (
                 <div key={top} style={{ top }} className="absolute left-0 right-0 h-px bg-white/10" />
               ))}
-
               <div className="absolute inset-0 flex items-end justify-around pb-6">
                 {taskBarData.map(([name, value]) => (
                   <div key={name} className="flex min-w-0 flex-col items-center">
@@ -546,9 +714,7 @@ export default function Dashboard() {
                         className="w-full rounded-[10px] bg-gradient-to-t from-[#6eb5ff] to-[#5b7dff] shadow-[0_0_20px_rgba(95,150,255,.35)] transition-all duration-500"
                       />
                     </div>
-                    <span className="mt-2 max-w-[50px] truncate text-center text-[10px] text-white/75">
-                      {name}
-                    </span>
+                    <span className="mt-2 max-w-[50px] truncate text-center text-[10px] text-white/75">{name}</span>
                     <span className="mt-1 text-[9px] text-[#78aaff]">{value}%</span>
                   </div>
                 ))}
@@ -556,54 +722,29 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TEAM DISCIPLINE */}
+          {/* TEAM DISCIPLINE — collapsible per-member to-do lists */}
           <div className={`${cardClass} flex flex-col`}>
             <div className="mb-5 flex shrink-0 items-center justify-between">
-              <h3 className="text-[17px] font-bold">Team Discipline</h3>
-              <Link to="/teams" className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100">
+              <div>
+                <h3 className="text-[17px] font-bold">Team Discipline</h3>
+                <p className="mt-0.5 text-[11px] text-white/35">Click a member to see their tasks</p>
+              </div>
+              <Link
+                to="/teams"
+                className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100"
+              >
                 View Team <FaArrowRight />
               </Link>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {loadingDiscipline ? (
-                <div className="py-8 text-center text-xs text-white/35">Loading team progress...</div>
+                <div className="py-8 text-center text-xs text-white/35">Loading team progress…</div>
               ) : teamDiscipline.length === 0 ? (
                 <div className="py-8 text-center text-xs text-white/25">No team members found.</div>
               ) : (
-                teamDiscipline.map((emp) => (
-                  <div key={emp.name} className="rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
-                          {emp.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-[13px] font-bold">{emp.name}</p>
-                          <p className="mt-1 text-[10px] text-white/45">{emp.role}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[12px] font-bold text-[#78aaff]">
-                          {emp.hasTasks ? `${emp.percent}%` : "—"}
-                        </span>
-                        {emp.hasTasks && (
-                          <p className="mt-0.5 text-[9px] text-white/35">
-                            {emp.doneCount}/{emp.taskCount} tasks
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="h-[7px] rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] transition-all duration-500"
-                        style={{ width: `${emp.percent}%` }}
-                      />
-                    </div>
-                    {!emp.hasTasks && (
-                      <p className="mt-2 text-[9px] text-white/30">No tasks assigned yet</p>
-                    )}
-                  </div>
+                teamDiscipline.map((person, idx) => (
+                  <MemberTaskCard key={`${person.id || person.name}-${idx}`} person={person} />
                 ))
               )}
             </div>
@@ -618,34 +759,39 @@ export default function Dashboard() {
                 </span>
                 <h3 className="text-[17px] font-bold">Notifications</h3>
               </div>
-              <Link to="/notifications" className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100">
+              <Link
+                to="/notifications"
+                className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100"
+              >
                 View All <FaArrowRight />
               </Link>
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
               {loadingNotif ? (
-                <div className="py-8 text-center text-xs text-white/35">Loading notifications...</div>
+                <div className="py-8 text-center text-xs text-white/35">Loading notifications…</div>
               ) : notifications.length === 0 ? (
                 <div className="py-8 text-center text-xs text-white/25">No notifications found.</div>
               ) : (
-                <div className="space-y-4">
-                  {notifications.map((item) => (
-                    <div key={item.id} className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]">
-                      <div className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.style?.color}`}>
-                        {item.style?.icon}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="truncate text-[13px] font-bold">{item.title}</h4>
-                        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/55">{item.desc}</p>
-                      </div>
-                      <span className="whitespace-nowrap text-[10px] text-white/35">{item.time}</span>
+                notifications.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]"
+                  >
+                    <div className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.style?.color}`}>
+                      {item.style?.icon}
                     </div>
-                  ))}
-                </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="truncate text-[13px] font-bold">{item.title}</h4>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/55">{item.desc}</p>
+                    </div>
+                    <span className="whitespace-nowrap text-[10px] text-white/35">{item.time}</span>
+                  </div>
+                ))
               )}
             </div>
           </div>
+
         </div>
       </div>
     </MainLayout>

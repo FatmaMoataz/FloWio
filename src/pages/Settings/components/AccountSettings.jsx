@@ -6,30 +6,51 @@ import {
 } from "react-icons/fa";
 import userService from "../../../services/userService";
 
-const defaultAvatar = "https://i.pravatar.cc/300?img=12";
+const DEFAULT_AVATAR = "https://i.pravatar.cc/300?img=12";
+
+// ── Cloudinary config (put these in your .env) ────────────────────────────────
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET; // unsigned preset
+
+async function uploadToCloudinary(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", UPLOAD_PRESET);
+  formData.append("folder", "flowio/avatars");
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) throw new Error("Image upload failed");
+  const data = await res.json();
+  return data.secure_url; // e.g. https://res.cloudinary.com/...
+}
 
 export default function AccountSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("info"); // "info" | "error"
-  const [avatar, setAvatar] = useState(defaultAvatar);
+  const [messageType, setMessageType] = useState("info");
 
-  // Local-only fields (not in backend model)
+  const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
+  const [pendingAvatarUrl, setPendingAvatarUrl] = useState(null); // staged until Save
+
+  const [account, setAccount] = useState({
+    fullName: "",
+    email: "",
+    role: "",
+    specialization: "none",
+  });
+
   const [localFields, setLocalFields] = useState({
     phone: "",
     linkedin: "",
     github: "",
     facebook: "",
-  });
-
-  // Backend-synced fields
-  const [account, setAccount] = useState({
-    fullName: "",
-    email: "",
-    role: "",        // maps to user.role (system role)
-    specialization: "none", // maps to user.specialization
   });
 
   // ── Fetch user on mount ───────────────────────────────────────────────────
@@ -43,8 +64,8 @@ export default function AccountSettings() {
           role: user.role || "",
           specialization: user.specialization || "none",
         });
+        setAvatar(user.avatar || DEFAULT_AVATAR);
 
-        // Restore local-only fields from localStorage
         const stored = JSON.parse(localStorage.getItem("flowio-local-profile") || "{}");
         setLocalFields({
           phone: stored.phone || "",
@@ -58,7 +79,6 @@ export default function AccountSettings() {
         setLoading(false);
       }
     };
-
     fetchUser();
   }, []);
 
@@ -75,26 +95,38 @@ export default function AccountSettings() {
   const updateLocal = (key, value) =>
     setLocalFields((prev) => ({ ...prev, [key]: value }));
 
-  // ── Avatar ────────────────────────────────────────────────────────────────
-  const uploadAvatar = (e) => {
+  // ── Avatar upload → Cloudinary (staged, not saved yet) ───────────────────
+  const uploadAvatar = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       showMessage("Please upload a valid image", "error");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatar(reader.result);
-      showMessage("Profile picture updated");
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+
+    // Show local preview immediately
+    const localPreview = URL.createObjectURL(file);
+    setAvatar(localPreview);
+    setUploadingAvatar(true);
+
+    try {
+      const cloudUrl = await uploadToCloudinary(file);
+      setPendingAvatarUrl(cloudUrl);       // stage it
+      setAvatar(cloudUrl);                 // update preview to final URL
+      showMessage("Photo ready — click Save to apply");
+    } catch (err) {
+      showMessage("Upload failed, please try again", "error");
+      setAvatar(account.avatar || DEFAULT_AVATAR); // revert preview
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = "";
+    }
   };
 
   const removeAvatar = () => {
-    setAvatar(defaultAvatar);
-    showMessage("Profile picture removed");
+    setAvatar(DEFAULT_AVATAR);
+    setPendingAvatarUrl(""); // empty string signals "remove avatar" on save
+    showMessage("Photo removed — click Save to apply");
   };
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -106,13 +138,19 @@ export default function AccountSettings() {
 
     setSaving(true);
     try {
-      // Only send fields the backend PUT /api/users/me accepts
-      await userService.updateProfile({
+      const payload = {
         name: account.fullName.trim(),
         specialization: account.specialization,
-      });
+      };
 
-      // Persist local-only fields in localStorage
+      // Only include avatar if it was changed
+      if (pendingAvatarUrl !== null) {
+        payload.avatar = pendingAvatarUrl || null;
+      }
+
+      await userService.updateProfile(payload);
+      setPendingAvatarUrl(null); // clear staged change
+
       localStorage.setItem("flowio-local-profile", JSON.stringify(localFields));
 
       setSaved(true);
@@ -125,7 +163,7 @@ export default function AccountSettings() {
     }
   };
 
-  // ── Reset (local display only — re-fetches from server) ──────────────────
+  // ── Reset ─────────────────────────────────────────────────────────────────
   const resetAccount = async () => {
     setLoading(true);
     try {
@@ -136,10 +174,11 @@ export default function AccountSettings() {
         role: user.role || "",
         specialization: user.specialization || "none",
       });
-      setAvatar(defaultAvatar);
+      setAvatar(user.avatar || DEFAULT_AVATAR);
+      setPendingAvatarUrl(null);
       setLocalFields({ phone: "", linkedin: "", github: "", facebook: "" });
       localStorage.removeItem("flowio-local-profile");
-      showMessage("Account data reset");
+      showMessage("Reset to saved profile");
     } catch (err) {
       showMessage(err.message || "Failed to reset", "error");
     } finally {
@@ -164,7 +203,7 @@ export default function AccountSettings() {
           onChange={(e) => !readOnly && onChange(e.target.value)}
           placeholder={placeholder}
           readOnly={readOnly}
-          className="h-full w-full bg-transparent text-xs text-white outline-none placeholder:text-white/35 disabled:opacity-50"
+          className="h-full w-full bg-transparent text-xs text-white outline-none placeholder:text-white/35"
         />
         {readOnly && (
           <span className="text-[9px] text-white/25 font-bold uppercase tracking-wider">locked</span>
@@ -193,7 +232,6 @@ export default function AccountSettings() {
     </div>
   );
 
-  // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -203,15 +241,12 @@ export default function AccountSettings() {
     );
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div className="animate-[fadeUp_.35s_ease] space-y-6 pb-4">
+      {/* Toast */}
       {message && (
         <div className={`fixed right-8 top-8 z-[9999] rounded-[18px] border px-5 py-4 text-sm font-bold text-white shadow-[0_20px_50px_rgba(0,0,0,.45)]
-          ${messageType === "error"
-            ? "border-red-400/20 bg-[#3a1020]"
-            : "border-blue-300/15 bg-[#10184c]"
-          }`}
+          ${messageType === "error" ? "border-red-400/20 bg-[#3a1020]" : "border-blue-300/15 bg-[#10184c]"}`}
         >
           {message}
         </div>
@@ -221,7 +256,9 @@ export default function AccountSettings() {
         {/* Profile Picture */}
         <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
           <h3 className="mb-2 text-[17px] font-bold">Profile Picture</h3>
-          <p className="mb-6 text-[11px] text-white/45">Upload, preview or remove your profile photo.</p>
+          <p className="mb-6 text-[11px] text-white/45">
+            Hosted on Cloudinary — syncs across all devices.
+          </p>
 
           <div className="flex flex-col items-center text-center">
             <div className="relative mb-5">
@@ -230,25 +267,45 @@ export default function AccountSettings() {
                 alt="Profile"
                 className="h-[126px] w-[126px] rounded-full border-4 border-blue-300/20 object-cover shadow-[0_0_25px_rgba(95,150,255,.25)]"
               />
+
+              {/* Upload spinner overlay */}
+              {uploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                  <FaSpinner className="animate-spin text-xl text-white" />
+                </div>
+              )}
+
+              {/* Pending badge */}
+              {pendingAvatarUrl !== null && !uploadingAvatar && (
+                <div className="absolute -top-1 -right-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-bold text-black">
+                  unsaved
+                </div>
+              )}
+
               <label className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)] transition hover:scale-110">
                 <FaCamera />
-                <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" />
+                <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" disabled={uploadingAvatar} />
               </label>
             </div>
 
             <h4 className="text-[18px] font-bold">{account.fullName || "—"}</h4>
-            <p className="mt-1 text-xs text-white/45">{account.role}</p>
+            <p className="mt-1 text-xs text-white/45 capitalize">{account.role}</p>
             <p className="mt-0.5 text-[10px] text-white/25 capitalize">{account.specialization}</p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <label className="flex h-10 cursor-pointer items-center gap-2 rounded-[14px] bg-blue-400/15 px-4 text-xs font-bold text-[#78aaff] transition hover:bg-blue-400/25">
-                <FaCamera /> Edit Photo
-                <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" />
+              <label className={`flex h-10 items-center gap-2 rounded-[14px] bg-blue-400/15 px-4 text-xs font-bold text-[#78aaff] transition hover:bg-blue-400/25
+                ${uploadingAvatar ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                {uploadingAvatar ? <FaSpinner className="animate-spin" /> : <FaCamera />}
+                {uploadingAvatar ? "Uploading…" : "Edit Photo"}
+                <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" disabled={uploadingAvatar} />
               </label>
+
               <button
                 type="button"
                 onClick={removeAvatar}
-                className="flex h-10 items-center gap-2 rounded-[14px] bg-red-400/15 px-4 text-xs font-bold text-[#ff6b8a] transition hover:bg-red-400/25"
+                disabled={uploadingAvatar}
+                className="flex h-10 items-center gap-2 rounded-[14px] bg-red-400/15 px-4 text-xs font-bold text-[#ff6b8a] transition hover:bg-red-400/25 disabled:opacity-50"
               >
                 <FaTrash /> Remove
               </button>
@@ -262,32 +319,17 @@ export default function AccountSettings() {
           <p className="mb-6 text-[11px] text-white/45">Update your account profile details.</p>
 
           <div className="grid grid-cols-2 gap-4">
-            {renderInputField(
-              <FaUser />, "Full Name", account.fullName,
-              (v) => updateAccount("fullName", v), "Enter full name"
-            )}
-            {renderInputField(
-              <FaEnvelope />, "Email Address", account.email,
-              null, "—", "email", true /* read-only: change email not supported */
-            )}
-            {renderInputField(
-              <FaPhoneAlt />, "Phone Number", localFields.phone,
-              (v) => updateLocal("phone", v), "Enter phone number"
-            )}
-            {renderInputField(
-              <FaBriefcase />, "System Role", account.role,
-              null, "—", "text", true /* read-only: managed by admin */
-            )}
-            {renderSelectField(
-              <FaBriefcase />, "Specialization", "specialization",
-              [
-                { value: "none", label: "None" },
-                { value: "developer", label: "Developer" },
-                { value: "designer", label: "Designer" },
-                { value: "qa", label: "QA" },
-                { value: "Employee", label: "Employee" },
-              ]
-            )}
+            {renderInputField(<FaUser />, "Full Name", account.fullName, (v) => updateAccount("fullName", v), "Enter full name")}
+            {renderInputField(<FaEnvelope />, "Email Address", account.email, null, "—", "email", true)}
+            {renderInputField(<FaPhoneAlt />, "Phone Number", localFields.phone, (v) => updateLocal("phone", v), "Enter phone number")}
+            {renderInputField(<FaBriefcase />, "System Role", account.role, null, "—", "text", true)}
+            {renderSelectField(<FaBriefcase />, "Specialization", "specialization", [
+              { value: "none", label: "None" },
+              { value: "developer", label: "Developer" },
+              { value: "designer", label: "Designer" },
+              { value: "qa", label: "QA" },
+              // { value: "Employee", label: "Employee" },
+            ])}
           </div>
         </div>
       </div>
@@ -299,7 +341,6 @@ export default function AccountSettings() {
           Add your professional and social media links.{" "}
           <span className="text-white/30">(Saved locally on this device)</span>
         </p>
-
         <div className="grid grid-cols-3 gap-4">
           {renderInputField(<FaLinkedinIn />, "LinkedIn", localFields.linkedin, (v) => updateLocal("linkedin", v), "LinkedIn profile link")}
           {renderInputField(<FaGithub />, "GitHub", localFields.github, (v) => updateLocal("github", v), "GitHub profile link")}
@@ -310,17 +351,14 @@ export default function AccountSettings() {
       {/* Actions */}
       <div className="flex items-center justify-between rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-5 shadow-[0_18px_40px_rgba(0,0,0,.18)]">
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={resetAccount}
+          <button type="button" onClick={resetAccount}
             className="flex h-11 items-center gap-2 rounded-[16px] bg-blue-400/15 px-5 text-sm font-bold text-[#78aaff] transition hover:bg-blue-400/25"
           >
             <FaUndo /> Reset
           </button>
-          <button
-            type="button"
+          <button type="button"
             onClick={() => {
-              if (window.confirm("Are you sure you want to clear local settings data?")) {
+              if (window.confirm("Clear locally stored phone and social links?")) {
                 localStorage.removeItem("flowio-local-profile");
                 setLocalFields({ phone: "", linkedin: "", github: "", facebook: "" });
                 showMessage("Local data cleared");
@@ -332,23 +370,13 @@ export default function AccountSettings() {
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={saveAccount}
-          disabled={saving}
-          className={`flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed ${
-            saved
-              ? "bg-emerald-400/20 text-[#5fffd0]"
-              : "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_20px_rgba(95,150,255,.30)] hover:-translate-y-1 hover:brightness-110"
-          }`}
+        <button type="button" onClick={saveAccount} disabled={saving || uploadingAvatar}
+          className={`flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed
+            ${saved ? "bg-emerald-400/20 text-[#5fffd0]" : "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_20px_rgba(95,150,255,.30)] hover:-translate-y-1 hover:brightness-110"}`}
         >
-          {saving ? (
-            <><FaSpinner className="animate-spin" /> Saving…</>
-          ) : saved ? (
-            <><FaCheck /> Saved</>
-          ) : (
-            <><FaSave /> Save Account</>
-          )}
+          {saving ? <><FaSpinner className="animate-spin" /> Saving…</>
+            : saved ? <><FaCheck /> Saved</>
+            : <><FaSave /> Save Account</>}
         </button>
       </div>
     </div>
