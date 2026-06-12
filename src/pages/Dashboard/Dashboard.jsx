@@ -29,14 +29,65 @@ const typeStyle = {
 };
 
 // Map your exact backend status values → done / in-progress / todo
-const isDone       = (s) => ["done", "completed"].includes((s || "").toLowerCase());
+const isDone = (s) => ["done", "completed"].includes((s || "").toLowerCase());
 const isInProgress = (s) => ["in-progress", "in_progress", "inprogress", "doing", "review"].includes((s || "").toLowerCase());
 
 // Convert status → a 0-100 progress number for the bar chart
 const statusToProgress = (s) => {
-  if (isDone(s))       return 100;
+  if (isDone(s)) return 100;
   if (isInProgress(s)) return 50;
-  return 0; // todo
+  return 0;
+};
+
+// Capitalize the first letter of every word
+const capitalizeWords = (str = "") =>
+  str
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(" ");
+
+// Formats role strings: "project-manager" → "Project Manager"
+const formatRole = (role) => {
+  if (!role) return "Team Member";
+  return role
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
+// Extract every assignee id from a task
+const extractAssigneeIds = (task) => {
+  const field = task.assignedTo ?? task.assignee ?? task.assigned_to;
+  if (!field) return [];
+
+  const items = Array.isArray(field) ? field : [field];
+
+  return items
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === "object") return String(item._id || item.id || "");
+      return String(item);
+    })
+    .filter(Boolean);
+};
+
+// Pull a populated assignee object (name/role) if available
+const extractAssigneeDetails = (task) => {
+  const field = task.assignedTo ?? task.assignee ?? task.assigned_to;
+  if (!field) return [];
+
+  const items = Array.isArray(field) ? field : [field];
+
+  return items
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      id: String(item._id || item.id || ""),
+      name: item.name,
+      role: item.specialization || item.role || item.role_in_team,
+    }))
+    .filter((d) => d.id);
 };
 
 export default function Dashboard() {
@@ -49,14 +100,12 @@ export default function Dashboard() {
   const [teamStats, setTeamStats] = useState({ total: 0, membersCount: 0 });
   const [loadingTeams, setLoadingTeams] = useState(true);
 
-  // ── Task state — now includes personal tasks too ──────────────────────────────
   const [taskStats, setTaskStats] = useState({ total: 0, pending: 0 });
   const [loadingTasks, setLoadingTasks] = useState(true);
 
   const [meetingStats, setMeetingStats] = useState({ total: 0, today: 0 });
   const [loadingMeetings, setLoadingMeetings] = useState(true);
 
-  // Bar chart: up to 4 tasks with real progress derived from status
   const [taskBarData, setTaskBarData] = useState([
     ["Task 1", 0], ["Task 2", 0], ["Task 3", 0], ["Task 4", 0],
   ]);
@@ -67,7 +116,6 @@ export default function Dashboard() {
     toDoPercent: 20,
   });
 
-  // ── Team Discipline — real members + their task-completion % ──────────────
   const [teamDiscipline, setTeamDiscipline] = useState([]);
   const [loadingDiscipline, setLoadingDiscipline] = useState(true);
 
@@ -93,7 +141,263 @@ export default function Dashboard() {
           "Authorization": `Bearer ${token}`,
         };
 
-        // 1. Notifications
+        // Store all data we collect
+        let fetchedProjects = [];
+        let allTasks = [];
+        let teamMembersMap = new Map();
+
+        // 1. Fetch Projects
+        if (companyId) {
+          setLoadingProjects(true);
+          try {
+            const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
+              method: "GET",
+              headers,
+            });
+
+            if (response.ok) {
+              const resData = await response.json();
+              fetchedProjects = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
+              const activeCount = fetchedProjects.filter((p) => (p.progress !== undefined ? p.progress < 100 : true)).length;
+              setProjectStats({ total: fetchedProjects.length, active: activeCount });
+            }
+          } catch (err) {
+            console.error("Error fetching projects:", err);
+          } finally {
+            setLoadingProjects(false);
+          }
+        }
+
+        // 2. Fetch Meetings
+        if (companyId && fetchedProjects.length > 0) {
+          setLoadingMeetings(true);
+          try {
+            let allMeetings = [];
+            await Promise.all(
+              fetchedProjects.map(async (project) => {
+                const pId = project._id || project.id;
+                try {
+                  const meetingsResp = await fetch(`https://flowio-backend.vercel.app/api/meetings/project/${pId}`, { method: "GET", headers });
+                  if (meetingsResp.ok) {
+                    const mData = await meetingsResp.json();
+                    allMeetings = [...allMeetings, ...(mData.data || (Array.isArray(mData) ? mData : []))];
+                  }
+                } catch (err) {
+                  console.error(`Error fetching meetings for project ${pId}:`, err);
+                }
+              })
+            );
+            const todayStr = new Date().toISOString().split("T")[0];
+            const meetingsToday = allMeetings.filter((m) => m.date && m.date.startsWith(todayStr)).length;
+            setMeetingStats({ total: allMeetings.length, today: meetingsToday });
+          } catch (err) {
+            console.error("Error fetching meetings:", err);
+          } finally {
+            setLoadingMeetings(false);
+          }
+        }
+
+        // 3. Fetch Tasks (both personal and project tasks)
+        setLoadingTasks(true);
+        try {
+          // Fetch personal tasks
+          const myTasksResp = await API.get("/api/tasks/my-tasks");
+          const myTasks = myTasksResp.data?.data || [];
+          
+          // Fetch project tasks
+          let projectTasks = [];
+          if (companyId && fetchedProjects.length > 0) {
+            await Promise.all(
+              fetchedProjects.map(async (project) => {
+                const pId = project._id || project.id;
+                try {
+                  const tResp = await fetch(`https://flowio-backend.vercel.app/api/projects/${pId}/tasks`, { method: "GET", headers });
+                  if (tResp.ok) {
+                    const tData = await tResp.json();
+                    projectTasks = [...projectTasks, ...(tData.data || [])];
+                  }
+                } catch (e) {
+                  console.error(`Error fetching tasks for project ${pId}:`, e);
+                }
+              })
+            );
+          }
+
+          // Deduplicate tasks
+          const seen = new Set();
+          allTasks = [...myTasks, ...projectTasks].filter((t) => {
+            const id = t._id || t.id;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+
+          const totalCount = allTasks.length;
+          const pendingCount = allTasks.filter((t) => !isDone(t.status)).length;
+          setTaskStats({ total: totalCount, pending: pendingCount });
+
+          // Donut chart percentages
+          if (totalCount > 0) {
+            const doneCount = allTasks.filter((t) => isDone(t.status)).length;
+            const inProgressCount = allTasks.filter((t) => isInProgress(t.status)).length;
+            const toDoCount = totalCount - doneCount - inProgressCount;
+            setProjectProgressStats({
+              donePercent: Math.round((doneCount / totalCount) * 100),
+              inProgressPercent: Math.round((inProgressCount / totalCount) * 100),
+              toDoPercent: Math.round((toDoCount / totalCount) * 100),
+            });
+          }
+
+          // Bar chart data
+          const chartTasks = allTasks.slice(0, 4);
+          const chartData = chartTasks.map((t) => {
+            const label = (t.title || "Task").length > 8
+              ? t.title.substring(0, 8) + ".."
+              : t.title;
+            return [label, statusToProgress(t.status)];
+          });
+          while (chartData.length < 4) chartData.push([`Task ${chartData.length + 1}`, 0]);
+          setTaskBarData(chartData);
+
+        } catch (err) {
+          console.error("Error fetching tasks:", err);
+          setTaskStats({ total: 0, pending: 0 });
+        } finally {
+          setLoadingTasks(false);
+        }
+
+        // 4. Fetch Teams and Members, then calculate discipline using allTasks
+        if (companyId) {
+          setLoadingTeams(true);
+          setLoadingDiscipline(true);
+          try {
+            // Fetch teams
+            const teamsResponse = await API.get(`/api/teams/company/${companyId}`);
+            const fetchedTeams = teamsResponse.data?.data || (Array.isArray(teamsResponse.data) ? teamsResponse.data : []);
+            
+            // Map to store member data
+            const memberMap = new Map();
+
+            if (fetchedTeams.length > 0) {
+              // Fetch members for each team
+              await Promise.all(
+                fetchedTeams.map(async (team) => {
+                  const teamId = team._id || team.id;
+                  if (!teamId) return;
+                  try {
+                    const membersResp = await API.get(`/api/teams/${teamId}/members`);
+                    const membersArray = membersResp.data?.data || (Array.isArray(membersResp.data) ? membersResp.data : []);
+                    
+                    membersArray.forEach((member) => {
+                      let userId = null;
+                      let userName = "Unknown";
+                      let userRole = "Team Member";
+                      
+                      // Handle populated userId object
+                      if (member.userId && typeof member.userId === "object") {
+                        userId = member.userId._id || member.userId.id;
+                        userName = member.userId.name || userName;
+                        userRole = member.userId.specialization || member.userId.role || member.role_in_team || userRole;
+                      } else if (member.userId) {
+                        userId = member.userId;
+                      } else {
+                        userId = member._id || member.id;
+                      }
+                      
+                      if (userId) {
+                        userId = String(userId);
+                        if (!memberMap.has(userId)) {
+                          memberMap.set(userId, {
+                            id: userId,
+                            name: userName,
+                            role: userRole,
+                            total: 0,
+                            done: 0,
+                          });
+                        } else {
+                          const existing = memberMap.get(userId);
+                          if (existing.name === "Unknown" && userName !== "Unknown") existing.name = userName;
+                          if ((existing.role === "Team Member" || existing.role === "member") && userRole) existing.role = userRole;
+                        }
+                      }
+                    });
+                  } catch (memberErr) {
+                    console.error(`Error fetching members for team ${teamId}:`, memberErr);
+                  }
+                })
+              );
+              setTeamStats({ total: fetchedTeams.length, membersCount: memberMap.size });
+            } else {
+              setTeamStats({ total: 0, membersCount: 0 });
+            }
+
+            // Calculate task completion for each member using the tasks we already fetched
+            console.log("Calculating discipline with tasks:", allTasks.length);
+            console.log("Member map size:", memberMap.size);
+            
+            allTasks.forEach((task) => {
+              const assigneeIds = extractAssigneeIds(task);
+              console.log(`Task "${task.title}" assignees:`, assigneeIds);
+              
+              if (assigneeIds.length === 0) return;
+
+              const assigneeDetails = extractAssigneeDetails(task);
+              const detailsById = new Map(assigneeDetails.map(d => [d.id, d]));
+
+              assigneeIds.forEach((assigneeId) => {
+                // Add member if not already in map
+                if (!memberMap.has(assigneeId)) {
+                  const details = detailsById.get(assigneeId);
+                  memberMap.set(assigneeId, {
+                    id: assigneeId,
+                    name: details?.name || "Unknown",
+                    role: details?.role || "Team Member",
+                    total: 0,
+                    done: 0,
+                  });
+                }
+                
+                const entry = memberMap.get(assigneeId);
+                entry.total += 1;
+                if (isDone(task.status)) {
+                  entry.done += 1;
+                }
+              });
+            });
+
+            // Log the results for debugging
+            console.log("Member map after tasks:");
+            memberMap.forEach((member, id) => {
+              console.log(`${member.name}: ${member.done}/${member.total} tasks (${member.total > 0 ? Math.round((member.done / member.total) * 100) : 0}%)`);
+            });
+
+            // Format discipline list
+            const disciplineList = Array.from(memberMap.values())
+              .map((member) => ({
+                name: capitalizeWords(member.name),
+                role: formatRole(member.role),
+                percent: member.total > 0 ? Math.round((member.done / member.total) * 100) : 0,
+                taskCount: member.total,
+                doneCount: member.done,
+                hasTasks: member.total > 0,
+              }))
+              .sort((a, b) => (b.hasTasks - a.hasTasks) || b.percent - a.percent || a.name.localeCompare(b.name))
+              .slice(0, 6);
+
+            console.log("Final discipline list:", disciplineList);
+            setTeamDiscipline(disciplineList);
+
+          } catch (err) {
+            console.error("Error fetching teams:", err);
+          } finally {
+            setLoadingTeams(false);
+            setLoadingDiscipline(false);
+          }
+        } else {
+          setLoadingDiscipline(false);
+        }
+
+        // 5. Fetch Notifications
         if (realUserId) {
           setLoadingNotif(true);
           try {
@@ -129,249 +433,6 @@ export default function Dashboard() {
           }
         }
 
-        // 2. Projects / Meetings (unchanged)
-        let fetchedProjectsForReuse = [];
-        if (companyId) {
-          setLoadingProjects(true);
-          setLoadingMeetings(true);
-          try {
-            const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
-              method: "GET",
-              headers,
-            });
-
-            if (response.ok) {
-              const resData = await response.json();
-              const fetchedProjects = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
-              fetchedProjectsForReuse = fetchedProjects;
-              const activeCount = fetchedProjects.filter((p) => (p.progress !== undefined ? p.progress < 100 : true)).length;
-              setProjectStats({ total: fetchedProjects.length, active: activeCount });
-
-              let allMeetings = [];
-              if (fetchedProjects.length > 0) {
-                await Promise.all(
-                  fetchedProjects.map(async (project) => {
-                    const pId = project._id || project.id;
-                    try {
-                      const meetingsResp = await fetch(`https://flowio-backend.vercel.app/api/meetings/project/${pId}`, { method: "GET", headers });
-                      if (meetingsResp.ok) {
-                        const mData = await meetingsResp.json();
-                        allMeetings = [...allMeetings, ...(mData.data || (Array.isArray(mData) ? mData : []))];
-                      }
-                    } catch (err) {
-                      console.error(`Error fetching meetings for project ${pId}:`, err);
-                    }
-                  })
-                );
-              }
-
-              const todayStr = new Date().toISOString().split("T")[0];
-              const meetingsToday = allMeetings.filter((m) => m.date && m.date.startsWith(todayStr)).length;
-              setMeetingStats({ total: allMeetings.length, today: meetingsToday });
-            }
-          } catch (err) {
-            console.error("Error fetching projects/meetings:", err);
-          } finally {
-            setLoadingProjects(false);
-            setLoadingMeetings(false);
-          }
-        }
-
-        // ── 3. TASKS — personal (my-tasks) + project tasks, merged ──────────────
-        let allProjectTasksForReuse = [];
-        setLoadingTasks(true);
-        try {
-          // Always fetch personal tasks assigned to the logged-in user
-          const myTasksResp = await API.get("/api/tasks/my-tasks");
-          const myTasks = myTasksResp.data?.data || [];
-
-          // Also fetch project tasks if the user belongs to a company
-          let projectTasks = [];
-          if (companyId) {
-            try {
-              const projects = fetchedProjectsForReuse.length
-                ? fetchedProjectsForReuse
-                : (await (async () => {
-                    const r = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, { method: "GET", headers });
-                    if (!r.ok) return [];
-                    const d = await r.json();
-                    return d.data || (Array.isArray(d) ? d : d.projects || []);
-                  })());
-
-              await Promise.all(
-                projects.map(async (project) => {
-                  const pId = project._id || project.id;
-                  try {
-                    const tResp = await fetch(`https://flowio-backend.vercel.app/api/projects/${pId}/tasks`, { method: "GET", headers });
-                    if (tResp.ok) {
-                      const tData = await tResp.json();
-                      projectTasks = [...projectTasks, ...(tData.data || [])];
-                    }
-                  } catch (e) { /* skip */ }
-                })
-              );
-            } catch (e) { /* skip project tasks if fetch fails */ }
-          }
-
-          allProjectTasksForReuse = projectTasks;
-
-          // Deduplicate by _id (a task may appear in both lists)
-          const seen = new Set();
-          const allTasks = [...myTasks, ...projectTasks].filter((t) => {
-            const id = t._id || t.id;
-            if (seen.has(id)) return false;
-            seen.add(id);
-            return true;
-          });
-
-          const totalCount  = allTasks.length;
-          const pendingCount = allTasks.filter((t) => !isDone(t.status)).length;
-          setTaskStats({ total: totalCount, pending: pendingCount });
-
-          // Donut chart percentages
-          if (totalCount > 0) {
-            const doneCount       = allTasks.filter((t) => isDone(t.status)).length;
-            const inProgressCount = allTasks.filter((t) => isInProgress(t.status)).length;
-            const toDoCount       = totalCount - doneCount - inProgressCount;
-            setProjectProgressStats({
-              donePercent:       Math.round((doneCount       / totalCount) * 100),
-              inProgressPercent: Math.round((inProgressCount / totalCount) * 100),
-              toDoPercent:       Math.round((toDoCount       / totalCount) * 100),
-            });
-          }
-
-          // Bar chart — pick the 4 most recent tasks, derive progress from status
-          const chartTasks = allTasks.slice(0, 4);
-          const chartData  = chartTasks.map((t) => {
-            const label = (t.title || "Task").length > 8
-              ? t.title.substring(0, 8) + ".."
-              : t.title;
-            return [label, statusToProgress(t.status)];
-          });
-          // Pad to always show 4 bars
-          while (chartData.length < 4) chartData.push([`Task ${chartData.length + 1}`, 0]);
-          setTaskBarData(chartData);
-
-        } catch (err) {
-          console.error("Error fetching tasks for dashboard:", err);
-          setTaskStats({ total: 0, pending: 0 });
-          setTaskBarData([["Task 1", 0], ["Task 2", 0], ["Task 3", 0], ["Task 4", 0]]);
-        } finally {
-          setLoadingTasks(false);
-        }
-
-        // 4. Teams + Team Discipline (real members + their task completion %)
-        if (companyId) {
-          setLoadingTeams(true);
-          setLoadingDiscipline(true);
-          try {
-            const response = await fetch(`https://flowio-backend.vercel.app/api/teams/company/${companyId}`, { method: "GET", headers });
-            if (response.ok) {
-              const resData = await response.json();
-              const fetchedTeams = resData.data || (Array.isArray(resData) ? resData : resData.teams || []);
-              const allMembersIds = new Set();
-
-              // Map of userId -> { name, specialization, total, done }
-              const memberMap = new Map();
-
-              if (fetchedTeams.length > 0) {
-                await Promise.all(
-                  fetchedTeams.map(async (team) => {
-                    const teamId = team._id || team.id;
-                    if (!teamId) return;
-                    try {
-                      const membersResp = await fetch(`https://flowio-backend.vercel.app/api/teams/${teamId}/members`, { method: "GET", headers });
-                      if (membersResp.ok) {
-                        const membersData = await membersResp.json();
-                        const membersArray = membersData.data || (Array.isArray(membersData) ? membersData : []);
-                        membersArray.forEach((m) => {
-                          let uId = null;
-                          let name = "Unknown";
-                          let specialization = m.role_in_team || "Member";
-
-                          if (m.userId && typeof m.userId === "object") {
-                            uId = m.userId._id || m.userId.id;
-                            name = m.userId.name || name;
-                            specialization = m.userId.specialization || specialization;
-                          } else if (m.userId) {
-                            uId = m.userId;
-                          } else {
-                            uId = m._id || m.id;
-                          }
-
-                          if (uId) {
-                            allMembersIds.add(String(uId));
-                            if (!memberMap.has(String(uId))) {
-                              memberMap.set(String(uId), { id: String(uId), name, specialization, total: 0, done: 0 });
-                            }
-                          }
-                        });
-                      }
-                    } catch (memberErr) {
-                      console.error(`Error fetching members for team ${teamId}:`, memberErr);
-                    }
-                  })
-                );
-                setTeamStats({ total: fetchedTeams.length, membersCount: allMembersIds.size });
-              } else {
-                setTeamStats({ total: 0, membersCount: 1 });
-              }
-
-              // ── Derive each member's task completion % from project tasks ──
-              // Tasks carry an `assignedTo` field (User ObjectId or populated object).
-              try {
-                allProjectTasksForReuse.forEach((t) => {
-                  let assignedId = null;
-                  if (t.assignedTo && typeof t.assignedTo === "object") {
-                    assignedId = t.assignedTo._id || t.assignedTo.id;
-                  } else if (t.assignedTo) {
-                    assignedId = t.assignedTo;
-                  }
-                  if (!assignedId) return;
-
-                  const key = String(assignedId);
-                  if (!memberMap.has(key)) {
-                    // Member exists in tasks but wasn't found in any team — still show them
-                    memberMap.set(key, {
-                      id: key,
-                      name: (t.assignedTo && t.assignedTo.name) || "Unknown",
-                      specialization: (t.assignedTo && t.assignedTo.specialization) || "Member",
-                      total: 0,
-                      done: 0,
-                    });
-                  }
-
-                  const entry = memberMap.get(key);
-                  entry.total += 1;
-                  if (isDone(t.status)) entry.done += 1;
-                });
-              } catch (e) {
-                console.error("Error computing team discipline:", e);
-              }
-
-              const disciplineList = Array.from(memberMap.values())
-                .map((m) => ({
-                  name: m.name,
-                  role: m.specialization,
-                  percent: m.total > 0 ? Math.round((m.done / m.total) * 100) : 0,
-                  hasTasks: m.total > 0,
-                }))
-                // Show members with tasks first, most active first
-                .sort((a, b) => (b.hasTasks - a.hasTasks) || b.percent - a.percent)
-                .slice(0, 6);
-
-              setTeamDiscipline(disciplineList);
-            }
-          } catch (err) {
-            console.error("Error fetching teams:", err);
-          } finally {
-            setLoadingTeams(false);
-            setLoadingDiscipline(false);
-          }
-        } else {
-          setLoadingDiscipline(false);
-        }
-
       } catch (error) {
         console.error("Dashboard init error:", error);
         setLoadingNotif(false);
@@ -390,10 +451,10 @@ export default function Dashboard() {
     "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-5 xl:p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
 
   const kpiItems = [
-    { icon: <FaProjectDiagram />, label: "Projects",  value: loadingProjects ? "..." : String(projectStats.total),  sub: `${projectStats.active} active` },
-    { icon: <FaTasks />,          label: "Tasks",     value: loadingTasks    ? "..." : String(taskStats.total),     sub: `${taskStats.pending} pending` },
-    { icon: <FaCalendarAlt />,    label: "Meetings",  value: loadingMeetings ? "..." : String(meetingStats.total),  sub: `${meetingStats.today} today` },
-    { icon: <FaUsers />,          label: "Teams",     value: loadingTeams    ? "..." : String(teamStats.total),     sub: `${teamStats.membersCount} members` },
+    { icon: <FaProjectDiagram />, label: "Projects", value: loadingProjects ? "..." : String(projectStats.total), sub: `${projectStats.active} active` },
+    { icon: <FaTasks />, label: "Tasks", value: loadingTasks ? "..." : String(taskStats.total), sub: `${taskStats.pending} pending` },
+    { icon: <FaCalendarAlt />, label: "Meetings", value: loadingMeetings ? "..." : String(meetingStats.total), sub: `${meetingStats.today} today` },
+    { icon: <FaUsers />, label: "Teams", value: loadingTeams ? "..." : String(teamStats.total), sub: `${teamStats.membersCount} members` },
   ];
 
   return (
@@ -440,9 +501,9 @@ export default function Dashboard() {
 
               <div className="space-y-4">
                 {[
-                  ["Done",        `${projectProgressStats.donePercent}%`,       "#7b5dff"],
+                  ["Done", `${projectProgressStats.donePercent}%`, "#7b5dff"],
                   ["In Progress", `${projectProgressStats.inProgressPercent}%`, "#d86bff"],
-                  ["To Do",       `${projectProgressStats.toDoPercent}%`,       "#59d3ff"],
+                  ["To Do", `${projectProgressStats.toDoPercent}%`, "#59d3ff"],
                 ].map(([label, value, color]) => (
                   <div key={label}>
                     <div className="mb-2 flex items-center justify-between text-[12px]">
@@ -495,7 +556,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TEAM DISCIPLINE — now driven by real team members + task completion % */}
+          {/* TEAM DISCIPLINE */}
           <div className={`${cardClass} flex flex-col`}>
             <div className="mb-5 flex shrink-0 items-center justify-between">
               <h3 className="text-[17px] font-bold">Team Discipline</h3>
@@ -519,12 +580,19 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <p className="text-[13px] font-bold">{emp.name}</p>
-                          <p className="mt-1 text-[10px] text-white/45 capitalize">{emp.role}</p>
+                          <p className="mt-1 text-[10px] text-white/45">{emp.role}</p>
                         </div>
                       </div>
-                      <span className="text-[12px] font-bold text-[#78aaff]">
-                        {emp.hasTasks ? `${emp.percent}%` : "—"}
-                      </span>
+                      <div className="text-right">
+                        <span className="text-[12px] font-bold text-[#78aaff]">
+                          {emp.hasTasks ? `${emp.percent}%` : "—"}
+                        </span>
+                        {emp.hasTasks && (
+                          <p className="mt-0.5 text-[9px] text-white/35">
+                            {emp.doneCount}/{emp.taskCount} tasks
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="h-[7px] rounded-full bg-white/10">
                       <div
@@ -540,7 +608,6 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          
 
           {/* NOTIFICATIONS */}
           <div className={`${cardClass} flex flex-col`}>

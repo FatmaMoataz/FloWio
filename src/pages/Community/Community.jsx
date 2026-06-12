@@ -1,5 +1,3 @@
-// Community.jsx — FULL REWRITE
-
 import { useState, useEffect } from "react";
 import {
   FaHeart,
