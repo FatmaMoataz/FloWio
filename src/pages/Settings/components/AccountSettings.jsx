@@ -1,71 +1,93 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  FaUser,
-  FaEnvelope,
-  FaPhoneAlt,
-  FaBriefcase,
-  FaCamera,
-  FaTrash,
-  FaSave,
-  FaCheck,
-  FaTimes,
-  FaLinkedinIn,
-  FaGithub,
-  FaFacebookF,
-  FaUndo,
+  FaUser, FaEnvelope, FaPhoneAlt, FaBriefcase, FaCamera,
+  FaTrash, FaSave, FaCheck, FaTimes, FaLinkedinIn,
+  FaGithub, FaFacebookF, FaUndo, FaSpinner,
 } from "react-icons/fa";
+import userService from "../../../services/userService";
 
 const defaultAvatar = "https://i.pravatar.cc/300?img=12";
 
 export default function AccountSettings() {
-  const savedAccount = JSON.parse(
-    localStorage.getItem("flowio-account") || "{}"
-  );
-
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
-  const [avatar, setAvatar] = useState(savedAccount.avatar || defaultAvatar);
+  const [messageType, setMessageType] = useState("info"); // "info" | "error"
+  const [avatar, setAvatar] = useState(defaultAvatar);
 
-  const [account, setAccount] = useState({
-    fullName: savedAccount.fullName || "Omar Khaled",
-    username: savedAccount.username || "omar_khaled",
-    email: savedAccount.email || "omar@gmail.com",
-    phone: savedAccount.phone || "+20 1023456874",
-    role: savedAccount.role || "Project Manager",
-    department: savedAccount.department || "Product Team",
-    linkedin: savedAccount.linkedin || "",
-    github: savedAccount.github || "",
-    facebook: savedAccount.facebook || "",
+  // Local-only fields (not in backend model)
+  const [localFields, setLocalFields] = useState({
+    phone: "",
+    linkedin: "",
+    github: "",
+    facebook: "",
   });
 
-  const showMessage = (text) => {
+  // Backend-synced fields
+  const [account, setAccount] = useState({
+    fullName: "",
+    email: "",
+    role: "",        // maps to user.role (system role)
+    specialization: "none", // maps to user.specialization
+  });
+
+  // ── Fetch user on mount ───────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await userService.getCurrentUser();
+        setAccount({
+          fullName: user.name || "",
+          email: user.email || "",
+          role: user.role || "",
+          specialization: user.specialization || "none",
+        });
+
+        // Restore local-only fields from localStorage
+        const stored = JSON.parse(localStorage.getItem("flowio-local-profile") || "{}");
+        setLocalFields({
+          phone: stored.phone || "",
+          linkedin: stored.linkedin || "",
+          github: stored.github || "",
+          facebook: stored.facebook || "",
+        });
+      } catch (err) {
+        showMessage(err.message || "Failed to load profile", "error");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const showMessage = (text, type = "info") => {
     setMessage(text);
-    setTimeout(() => setMessage(""), 2300);
+    setMessageType(type);
+    setTimeout(() => setMessage(""), 2800);
   };
 
-  const updateField = (key, value) => {
-    setAccount((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
+  const updateAccount = (key, value) =>
+    setAccount((prev) => ({ ...prev, [key]: value }));
 
+  const updateLocal = (key, value) =>
+    setLocalFields((prev) => ({ ...prev, [key]: value }));
+
+  // ── Avatar ────────────────────────────────────────────────────────────────
   const uploadAvatar = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
-      showMessage("Please upload a valid image");
+      showMessage("Please upload a valid image", "error");
       return;
     }
-
     const reader = new FileReader();
-
     reader.onload = () => {
       setAvatar(reader.result);
       showMessage("Profile picture updated");
     };
-
     reader.readAsDataURL(file);
     e.target.value = "";
   };
@@ -75,105 +97,131 @@ export default function AccountSettings() {
     showMessage("Profile picture removed");
   };
 
-  const resetAccount = () => {
-    setAccount({
-      fullName: "Omar Khaled",
-      username: "omar_khaled",
-      email: "omar@gmail.com",
-      phone: "+20 1023456874",
-      role: "Project Manager",
-      department: "Product Team",
-      linkedin: "",
-      github: "",
-      facebook: "",
-    });
-
-    setAvatar(defaultAvatar);
-    localStorage.removeItem("flowio-account");
-    showMessage("Account data reset");
-  };
-
-  const saveAccount = () => {
+  // ── Save ──────────────────────────────────────────────────────────────────
+  const saveAccount = async () => {
     if (!account.fullName.trim()) {
-      showMessage("Full name is required");
+      showMessage("Full name is required", "error");
       return;
     }
 
-    if (!account.username.trim()) {
-      showMessage("Username is required");
-      return;
+    setSaving(true);
+    try {
+      // Only send fields the backend PUT /api/users/me accepts
+      await userService.updateProfile({
+        name: account.fullName.trim(),
+        specialization: account.specialization,
+      });
+
+      // Persist local-only fields in localStorage
+      localStorage.setItem("flowio-local-profile", JSON.stringify(localFields));
+
+      setSaved(true);
+      showMessage("Account settings saved successfully");
+      setTimeout(() => setSaved(false), 2200);
+    } catch (err) {
+      showMessage(err.message || "Failed to save settings", "error");
+    } finally {
+      setSaving(false);
     }
-
-    if (!account.email.trim() || !/\S+@\S+\.\S+/.test(account.email)) {
-      showMessage("Please enter a valid email");
-      return;
-    }
-
-    localStorage.setItem(
-      "flowio-account",
-      JSON.stringify({
-        ...account,
-        avatar,
-      })
-    );
-
-    setSaved(true);
-    showMessage("Account settings saved successfully");
-
-    setTimeout(() => setSaved(false), 2200);
   };
 
-  const deleteAccount = () => {
-    const ok = window.confirm(
-      "Are you sure you want to delete this account data?"
-    );
-
-    if (!ok) return;
-
-    localStorage.removeItem("flowio-account");
-    resetAccount();
-    showMessage("Account data deleted");
+  // ── Reset (local display only — re-fetches from server) ──────────────────
+  const resetAccount = async () => {
+    setLoading(true);
+    try {
+      const user = await userService.getCurrentUser();
+      setAccount({
+        fullName: user.name || "",
+        email: user.email || "",
+        role: user.role || "",
+        specialization: user.specialization || "none",
+      });
+      setAvatar(defaultAvatar);
+      setLocalFields({ phone: "", linkedin: "", github: "", facebook: "" });
+      localStorage.removeItem("flowio-local-profile");
+      showMessage("Account data reset");
+    } catch (err) {
+      showMessage(err.message || "Failed to reset", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const renderInputField = (
-    icon,
-    label,
-    field,
-    placeholder,
-    type = "text"
-  ) => (
+  // ── Render helpers ────────────────────────────────────────────────────────
+  const renderInputField = (icon, label, value, onChange, placeholder, type = "text", readOnly = false) => (
     <div>
       <p className="mb-2 text-[12px] font-bold text-white/70">{label}</p>
-
-      <div className="flex h-12 items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#0b1246]/85 px-4 transition focus-within:border-[#6eb5ff]/50 focus-within:shadow-[0_0_18px_rgba(95,150,255,.18)]">
-        <span className="text-[#78aaff]">{icon}</span>
-
+      <div className={`flex h-12 items-center gap-3 rounded-[16px] border px-4 transition
+        ${readOnly
+          ? "border-blue-300/5 bg-[#0b1246]/50 cursor-not-allowed"
+          : "border-blue-300/10 bg-[#0b1246]/85 focus-within:border-[#6eb5ff]/50 focus-within:shadow-[0_0_18px_rgba(95,150,255,.18)]"
+        }`}
+      >
+        <span className={readOnly ? "text-white/30" : "text-[#78aaff]"}>{icon}</span>
         <input
           type={type}
-          value={account[field]}
-          onChange={(e) => updateField(field, e.target.value)}
+          value={value}
+          onChange={(e) => !readOnly && onChange(e.target.value)}
           placeholder={placeholder}
-          className="h-full w-full bg-transparent text-xs text-white outline-none placeholder:text-white/35"
+          readOnly={readOnly}
+          className="h-full w-full bg-transparent text-xs text-white outline-none placeholder:text-white/35 disabled:opacity-50"
         />
+        {readOnly && (
+          <span className="text-[9px] text-white/25 font-bold uppercase tracking-wider">locked</span>
+        )}
       </div>
     </div>
   );
 
+  const renderSelectField = (icon, label, field, options) => (
+    <div>
+      <p className="mb-2 text-[12px] font-bold text-white/70">{label}</p>
+      <div className="flex h-12 items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#0b1246]/85 px-4 transition focus-within:border-[#6eb5ff]/50">
+        <span className="text-[#78aaff]">{icon}</span>
+        <select
+          value={account[field]}
+          onChange={(e) => updateAccount(field, e.target.value)}
+          className="h-full w-full bg-transparent text-xs text-white outline-none appearance-none cursor-pointer"
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value} className="bg-[#0b1246]">
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+
+  // ── Loading skeleton ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <FaSpinner className="animate-spin text-2xl text-[#78aaff]" />
+        <span className="ml-3 text-sm text-white/50">Loading profile…</span>
+      </div>
+    );
+  }
+
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div className="animate-[fadeUp_.35s_ease] space-y-6 pb-4">
       {message && (
-        <div className="fixed right-8 top-8 z-[9999] rounded-[18px] border border-blue-300/15 bg-[#10184c] px-5 py-4 text-sm font-bold text-white shadow-[0_20px_50px_rgba(0,0,0,.45)]">
+        <div className={`fixed right-8 top-8 z-[9999] rounded-[18px] border px-5 py-4 text-sm font-bold text-white shadow-[0_20px_50px_rgba(0,0,0,.45)]
+          ${messageType === "error"
+            ? "border-red-400/20 bg-[#3a1020]"
+            : "border-blue-300/15 bg-[#10184c]"
+          }`}
+        >
           {message}
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[.9fr_1.1fr] lg:gap-6">
+        {/* Profile Picture */}
         <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
           <h3 className="mb-2 text-[17px] font-bold">Profile Picture</h3>
-
-          <p className="mb-6 text-[11px] text-white/45">
-            Upload, preview or remove your profile photo.
-          </p>
+          <p className="mb-6 text-[11px] text-white/45">Upload, preview or remove your profile photo.</p>
 
           <div className="flex flex-col items-center text-center">
             <div className="relative mb-5">
@@ -182,134 +230,84 @@ export default function AccountSettings() {
                 alt="Profile"
                 className="h-[126px] w-[126px] rounded-full border-4 border-blue-300/20 object-cover shadow-[0_0_25px_rgba(95,150,255,.25)]"
               />
-
               <label className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)] transition hover:scale-110">
                 <FaCamera />
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={uploadAvatar}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" />
               </label>
             </div>
 
-            <h4 className="text-[18px] font-bold">{account.fullName}</h4>
+            <h4 className="text-[18px] font-bold">{account.fullName || "—"}</h4>
             <p className="mt-1 text-xs text-white/45">{account.role}</p>
+            <p className="mt-0.5 text-[10px] text-white/25 capitalize">{account.specialization}</p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <label className="flex h-10 cursor-pointer items-center gap-2 rounded-[14px] bg-blue-400/15 px-4 text-xs font-bold text-[#78aaff] transition hover:bg-blue-400/25">
-                <FaCamera />
-                Edit Photo
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={uploadAvatar}
-                  className="hidden"
-                />
+                <FaCamera /> Edit Photo
+                <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" />
               </label>
-
               <button
                 type="button"
                 onClick={removeAvatar}
                 className="flex h-10 items-center gap-2 rounded-[14px] bg-red-400/15 px-4 text-xs font-bold text-[#ff6b8a] transition hover:bg-red-400/25"
               >
-                <FaTrash />
-                Remove
+                <FaTrash /> Remove
               </button>
             </div>
           </div>
         </div>
 
+        {/* Personal Information */}
         <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
-          <h3 className="mb-2 text-[17px] font-bold">
-            Personal Information
-          </h3>
-
-          <p className="mb-6 text-[11px] text-white/45">
-            Update your account profile details.
-          </p>
+          <h3 className="mb-2 text-[17px] font-bold">Personal Information</h3>
+          <p className="mb-6 text-[11px] text-white/45">Update your account profile details.</p>
 
           <div className="grid grid-cols-2 gap-4">
             {renderInputField(
-              <FaUser />,
-              "Full Name",
-              "fullName",
-              "Enter full name"
+              <FaUser />, "Full Name", account.fullName,
+              (v) => updateAccount("fullName", v), "Enter full name"
             )}
-
             {renderInputField(
-              <FaUser />,
-              "Username",
-              "username",
-              "Enter username"
+              <FaEnvelope />, "Email Address", account.email,
+              null, "—", "email", true /* read-only: change email not supported */
             )}
-
             {renderInputField(
-              <FaEnvelope />,
-              "Email Address",
-              "email",
-              "Enter email",
-              "email"
+              <FaPhoneAlt />, "Phone Number", localFields.phone,
+              (v) => updateLocal("phone", v), "Enter phone number"
             )}
-
             {renderInputField(
-              <FaPhoneAlt />,
-              "Phone Number",
-              "phone",
-              "Enter phone number"
+              <FaBriefcase />, "System Role", account.role,
+              null, "—", "text", true /* read-only: managed by admin */
             )}
-
-            {renderInputField(
-              <FaBriefcase />,
-              "Role",
-              "role",
-              "Enter role"
-            )}
-
-            {renderInputField(
-              <FaBriefcase />,
-              "Department",
-              "department",
-              "Enter department"
+            {renderSelectField(
+              <FaBriefcase />, "Specialization", "specialization",
+              [
+                { value: "none", label: "None" },
+                { value: "developer", label: "Developer" },
+                { value: "designer", label: "Designer" },
+                { value: "qa", label: "QA" },
+                { value: "Employee", label: "Employee" },
+              ]
             )}
           </div>
         </div>
       </div>
 
+      {/* Social Links */}
       <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69]">
         <h3 className="mb-2 text-[17px] font-bold">Social Links</h3>
-
         <p className="mb-6 text-[11px] text-white/45">
-          Add your professional and social media links.
+          Add your professional and social media links.{" "}
+          <span className="text-white/30">(Saved locally on this device)</span>
         </p>
 
         <div className="grid grid-cols-3 gap-4">
-          {renderInputField(
-            <FaLinkedinIn />,
-            "LinkedIn",
-            "linkedin",
-            "LinkedIn profile link"
-          )}
-
-          {renderInputField(
-            <FaGithub />,
-            "GitHub",
-            "github",
-            "GitHub profile link"
-          )}
-
-          {renderInputField(
-            <FaFacebookF />,
-            "Facebook",
-            "facebook",
-            "Facebook profile link"
-          )}
+          {renderInputField(<FaLinkedinIn />, "LinkedIn", localFields.linkedin, (v) => updateLocal("linkedin", v), "LinkedIn profile link")}
+          {renderInputField(<FaGithub />, "GitHub", localFields.github, (v) => updateLocal("github", v), "GitHub profile link")}
+          {renderInputField(<FaFacebookF />, "Facebook", localFields.facebook, (v) => updateLocal("facebook", v), "Facebook profile link")}
         </div>
       </div>
 
+      {/* Actions */}
       <div className="flex items-center justify-between rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-5 shadow-[0_18px_40px_rgba(0,0,0,.18)]">
         <div className="flex gap-3">
           <button
@@ -317,39 +315,39 @@ export default function AccountSettings() {
             onClick={resetAccount}
             className="flex h-11 items-center gap-2 rounded-[16px] bg-blue-400/15 px-5 text-sm font-bold text-[#78aaff] transition hover:bg-blue-400/25"
           >
-            <FaUndo />
-            Reset
+            <FaUndo /> Reset
           </button>
-
           <button
             type="button"
-            onClick={deleteAccount}
+            onClick={() => {
+              if (window.confirm("Are you sure you want to clear local settings data?")) {
+                localStorage.removeItem("flowio-local-profile");
+                setLocalFields({ phone: "", linkedin: "", github: "", facebook: "" });
+                showMessage("Local data cleared");
+              }
+            }}
             className="flex h-11 items-center gap-2 rounded-[16px] bg-red-400/15 px-5 text-sm font-bold text-[#ff6b8a] transition hover:bg-red-400/25"
           >
-            <FaTimes />
-            Delete Account
+            <FaTimes /> Clear Local Data
           </button>
         </div>
 
         <button
           type="button"
           onClick={saveAccount}
-          className={`flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 ${
+          disabled={saving}
+          className={`flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed ${
             saved
               ? "bg-emerald-400/20 text-[#5fffd0]"
               : "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_20px_rgba(95,150,255,.30)] hover:-translate-y-1 hover:brightness-110"
           }`}
         >
-          {saved ? (
-            <>
-              <FaCheck />
-              Saved
-            </>
+          {saving ? (
+            <><FaSpinner className="animate-spin" /> Saving…</>
+          ) : saved ? (
+            <><FaCheck /> Saved</>
           ) : (
-            <>
-              <FaSave />
-              Save Account
-            </>
+            <><FaSave /> Save Account</>
           )}
         </button>
       </div>
