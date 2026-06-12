@@ -28,9 +28,13 @@ export default function Profile() {
     avatar: "" 
   });
   
-  // دمج المشاريع الحقيقية في الـ State بدل can البيانات الثابتة
+  // دمج المشاريع الحقيقية في الـ State بدل من البيانات الثابتة
   const [realProjects, setRealProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+
+  // الـ State الجديدة لجلب عدد المهام الحقيقية ديناميكياً من الـ API
+  const [taskCount, setTaskCount] = useState(0);
+  const [loadingTasks, setLoadingTasks] = useState(true);
 
   // دالة لتحديد الأيقونة والألوان ديناميكياً بناءً على اسم المشروع الحقيقي
   const getProjectStyle = (title = "") => {
@@ -103,7 +107,32 @@ export default function Profile() {
           }
         };
 
+        // جلب المهام الحقيقية الموكلة للمستخدم لحساب عددها ديناميكياً
+        const fetchProfileTasks = async () => {
+          try {
+            const response = await fetch(`https://flowio-backend.vercel.app/api/tasks/my-tasks`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                "x-auth-token": token,
+                "Authorization": `Bearer ${token}`
+              },
+            });
+            if (response.ok) {
+              const resData = await response.json();
+              const fetchedTasks = resData.data || (Array.isArray(resData) ? resData : resData.tasks || []);
+              setTaskCount(fetchedTasks.length);
+            }
+          } catch (err) {
+            console.error("Error fetching tasks count for profile:", err);
+            setTaskCount(0);
+          } finally {
+            setLoadingTasks(false);
+          }
+        };
+
         fetchProfileProjects();
+        fetchProfileTasks();
 
       } catch (error) {
         console.error("Error decoding token in profile:", error);
@@ -113,6 +142,7 @@ export default function Profile() {
           avatar: "" 
         });
         setLoadingProjects(false);
+        setLoadingTasks(false);
       }
     }
   }, []);
@@ -286,7 +316,7 @@ export default function Profile() {
           <div className="mb-5 grid grid-cols-3 gap-2">
             {[
               [<FaChartLine />, "80%", "Progress"],
-              [<FaTasks />, "11", "Tasks"],
+              [<FaTasks />, loadingTasks ? "..." : `${taskCount}`, "Tasks"],
               [<FaUsers />, "2", "Teams"],
             ].map((item) => (
               <div
