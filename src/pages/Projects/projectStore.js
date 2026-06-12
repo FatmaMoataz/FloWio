@@ -80,6 +80,63 @@ const countSubtasks = (epics = []) =>
     0,
   );
 
+const normalizeTaskStatus = (status) => {
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+
+  if (["completed", "complete", "done"].includes(normalized)) {
+    return "completed";
+  }
+  if (["todo", "to-do", "pending", "backlog"].includes(normalized)) {
+    return "todo";
+  }
+  return "in-progress";
+};
+
+const createAssignedTasks = (project, epics) => {
+  if (Array.isArray(project.assignedTasks) && project.assignedTasks.length) {
+    return project.assignedTasks.map((task, index) => ({
+      ...task,
+      id: task.id || `${project.id}-assigned-task-${index}`,
+      name: task.name || `Task ${index + 1}`,
+      priority: task.priority || "Medium",
+      due: task.due || "No due date",
+      status: normalizeTaskStatus(task.status),
+    }));
+  }
+
+  const subtasks = epics.flatMap((epic) =>
+    (epic.stories || []).flatMap((story) =>
+      (story.subtasks || []).map((subtask) => ({
+        id: subtask.id,
+        name: subtask.name,
+        epicName: epic.name,
+        storyName: story.name,
+      })),
+    ),
+  );
+  const fallback = [
+    "Optimize Web Content",
+    "Update Portfolio Case Study",
+    "Design new homepage layout",
+    "Create wireframes for landing page",
+  ].map((name, index) => ({
+    id: `${project.id}-assigned-task-${index}`,
+    name,
+    epicName: "Project Tasks",
+    storyName: "Assigned Work",
+  }));
+
+  return (subtasks.length ? subtasks : fallback).map((task, index) => ({
+    ...task,
+    priority: ["Low", "Medium", "High", "High"][index % 4],
+    due: ["Sep 15", "Oct 15", "Tomorrow", "Sep 12"][index % 4],
+    status: index === 0 || index === 3 ? "completed" : "in-progress",
+  }));
+};
+
 const withPresentation = (project, index = 0) => {
   const progress = Number.isFinite(Number(project.progress))
     ? Math.max(0, Math.min(100, Number(project.progress)))
@@ -95,11 +152,13 @@ const withPresentation = (project, index = 0) => {
     Array.isArray(project.epics) && project.epics.length
       ? project.epics
       : createDefaultEpics(presented);
+  const assignedTasks = createAssignedTasks(presented, epics);
 
   return {
     ...presented,
     epics,
-    tasks: countSubtasks(epics) || Number(project.tasks) || 0,
+    assignedTasks,
+    tasks: assignedTasks.length || countSubtasks(epics) || Number(project.tasks) || 0,
   };
 };
 
@@ -130,6 +189,23 @@ export const saveProjects = (projects) => {
 
 export const getProject = (projectId) =>
   loadProjects().find((project) => project.id === projectId);
+
+export const updateProjectTaskStatus = (projectId, taskId, status) => {
+  const projects = loadProjects();
+  let updatedProject = null;
+  const updatedProjects = projects.map((project) => {
+    if (project.id !== projectId) return project;
+    updatedProject = {
+      ...project,
+      assignedTasks: project.assignedTasks.map((task) =>
+        task.id === taskId ? { ...task, status } : task,
+      ),
+    };
+    return updatedProject;
+  });
+  saveProjects(updatedProjects);
+  return updatedProject;
+};
 
 export const createProject = (project) => {
   const projects = loadProjects();

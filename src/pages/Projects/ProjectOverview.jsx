@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -13,7 +13,11 @@ import {
   FaRegSquare,
 } from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
-import { getProject, getProjectColor } from "./projectStore";
+import {
+  getProject,
+  getProjectColor,
+  updateProjectTaskStatus,
+} from "./projectStore";
 
 const priorityStyles = {
   Low: "bg-violet-400 text-white",
@@ -37,11 +41,10 @@ function AssistantAvatar({ compact = false }) {
 export default function ProjectOverview() {
   const navigate = useNavigate();
   const { projectId } = useParams();
-  const project = getProject(projectId);
+  const [project, setProject] = useState(() => getProject(projectId));
   const menuRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [checked, setChecked] = useState(() => new Set([0, 3]));
   const [message, setMessage] = useState("");
   const [assistantMessage, setAssistantMessage] = useState(
     "Hello! I'm here to assist you.\nNeed help with your tasks?",
@@ -55,33 +58,19 @@ export default function ProjectOverview() {
     return () => document.removeEventListener("mousedown", closeMenu);
   }, []);
 
-  const tasks = useMemo(() => {
-    if (!project) return [];
-    const flattened = project.epics.flatMap((epic) =>
-      epic.stories.flatMap((story) =>
-        story.subtasks.map((subtask) => subtask.name),
-      ),
-    );
-    const fallback = [
-      "Optimize Web Content",
-      "Update Portfolio Case Study",
-      "Design new homepage layout",
-      "Create wireframes for landing page",
-    ];
-    return (flattened.length ? flattened : fallback).map((name, index) => ({
-      id: `${project.id}-overview-task-${index}`,
-      name,
-      priority: ["Low", "Medium", "High", "High"][index % 4],
-      due: ["Sep 15", "Oct 15", "Tomorrow", "Sep 12"][index % 4],
-    }));
-  }, [project]);
-
   if (!project) {
     return <MainLayout><div className="flex h-full items-center justify-center text-white/60">Project not found.</div></MainLayout>;
   }
 
   const color = getProjectColor(project);
+  const tasks = project.assignedTasks || [];
   const visibleTasks = showAll ? tasks : tasks.slice(0, 4);
+  const toggleTask = (task) => {
+    const status =
+      task.status === "completed" ? "in-progress" : "completed";
+    const updatedProject = updateProjectTaskStatus(project.id, task.id, status);
+    if (updatedProject) setProject(updatedProject);
+  };
   const sendMessage = (event) => {
     event.preventDefault();
     if (!message.trim()) return;
@@ -139,20 +128,13 @@ export default function ProjectOverview() {
 
               <div className="flowio-overview-task-panel mt-5 rounded-[28px] border border-white/[0.025] bg-[radial-gradient(ellipse_at_50%_45%,rgba(29,42,91,.88),rgba(14,22,64,.96))] p-5 sm:p-6">
                 <div className="space-y-5">
-                  {visibleTasks.map((task, index) => {
-                    const isChecked = checked.has(index);
+                  {visibleTasks.map((task) => {
+                    const isChecked = task.status === "completed";
                     return (
                       <button
                         key={task.id}
                         type="button"
-                        onClick={() =>
-                          setChecked((current) => {
-                            const next = new Set(current);
-                            if (next.has(index)) next.delete(index);
-                            else next.add(index);
-                            return next;
-                          })
-                        }
+                        onClick={() => toggleTask(task)}
                         className="flex w-full items-center gap-2 text-left text-xs"
                       >
                         {isChecked ? <FaCheckSquare className="shrink-0 text-[#a9c7ff]" /> : <FaRegSquare className="shrink-0 text-white/75" />}

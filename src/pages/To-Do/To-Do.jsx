@@ -12,33 +12,40 @@ import {
 import MainLayout from "../../layout/MainLayout";
 import taskService from "../../services/taskService";
 
-const STATUS   = { todo: "todo", inProgress: "in-progress", review: "review", done: "done" };
+const STATUS = {
+  todo: "todo",
+  inProgress: "in-progress",
+  review: "review",
+  done: "done",
+};
 const PRIORITY = { low: "low", medium: "medium", high: "high" };
 
 const PRIORITY_COLORS = {
-  high:   "text-red-400    border-red-400/40    bg-red-400/10",
+  high: "text-red-400    border-red-400/40    bg-red-400/10",
   medium: "text-yellow-400 border-yellow-400/40 bg-yellow-400/10",
-  low:    "text-green-400  border-green-400/40  bg-green-400/10",
+  low: "text-green-400  border-green-400/40  bg-green-400/10",
 };
 
 const isCompleted = (task) => task.status === STATUS.done;
 
 function PriorityBadge({ priority }) {
   return (
-    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${PRIORITY_COLORS[priority] ?? ""}`}>
+    <span
+      className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${PRIORITY_COLORS[priority] ?? ""}`}
+    >
       {priority}
     </span>
   );
 }
 
 export default function ToDo() {
-  const [tasks,    setTasks]    = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState(null);
-  const [filter,   setFilter]   = useState("all");
-  const [search,   setSearch]   = useState("");
-  const [newTask,  setNewTask]  = useState("");
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [newTask, setNewTask] = useState("");
   const [priority, setPriority] = useState(PRIORITY.medium);
   const [deadline, setDeadline] = useState("");
 
@@ -56,7 +63,9 @@ export default function ToDo() {
     }
   }, []);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   // ── Derived list ─────────────────────────────────────────────────────────────
   const visibleTasks = useMemo(() => {
@@ -64,8 +73,8 @@ export default function ToDo() {
     return tasks.filter((task) => {
       const matchFilter =
         filter === "all" ||
-        (filter === "active"    && !isCompleted(task)) ||
-        (filter === "completed" &&  isCompleted(task));
+        (filter === "active" && !isCompleted(task)) ||
+        (filter === "completed" && isCompleted(task));
       const matchSearch = !q || task.title.toLowerCase().includes(q);
       return matchFilter && matchSearch;
     });
@@ -103,15 +112,19 @@ export default function ToDo() {
     const nextStatus = isCompleted(task) ? STATUS.todo : STATUS.done;
     // optimistic
     setTasks((prev) =>
-      prev.map((t) => (t._id === task._id ? { ...t, status: nextStatus } : t))
+      prev.map((t) => (t._id === task._id ? { ...t, status: nextStatus } : t)),
     );
     try {
-      const updated = await taskService.updateTask(task._id, { status: nextStatus });
+      const updated = await taskService.updateTask(task._id, {
+        status: nextStatus,
+      });
       setTasks((prev) => prev.map((t) => (t._id === task._id ? updated : t)));
     } catch (err) {
       // revert
       setTasks((prev) =>
-        prev.map((t) => (t._id === task._id ? { ...t, status: task.status } : t))
+        prev.map((t) =>
+          t._id === task._id ? { ...t, status: task.status } : t,
+        ),
       );
       setError(err.message ?? "Failed to update task.");
     }
@@ -142,7 +155,6 @@ export default function ToDo() {
       searchPlaceholder="Search tasks..."
     >
       <div className="h-full overflow-y-auto pb-6 text-white lg:pr-2">
-
         {/* ── Header card ───────────────────────────────────────────────────── */}
         <section className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_16px_40px_rgba(1,4,25,.24)] sm:rounded-[28px] sm:p-6">
           <div className="mb-6 flex items-center justify-between">
@@ -196,7 +208,9 @@ export default function ToDo() {
                 className="rounded-xl border border-white/10 bg-[#080d31] px-3 py-1.5 text-xs text-white/60 outline-none focus:border-[#64CFFF]"
               >
                 {Object.values(PRIORITY).map((p) => (
-                  <option key={p} value={p} className="capitalize">{p}</option>
+                  <option key={p} value={p} className="capitalize">
+                    {p}
+                  </option>
                 ))}
               </select>
             </div>
@@ -215,7 +229,13 @@ export default function ToDo() {
           <div className="mt-4 flex items-center gap-3 rounded-[16px] border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-300">
             <FaExclamationCircle className="shrink-0" />
             <span className="flex-1">{error}</span>
-            <button type="button" onClick={() => setError(null)} className="text-xs text-red-300/60 hover:text-red-300">✕</button>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-xs text-red-300/60 hover:text-red-300"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -241,16 +261,25 @@ export default function ToDo() {
         <section className="space-y-3">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-[62px] animate-pulse rounded-[20px] bg-[#10184c]/50" />
+              <div
+                key={i}
+                className="h-[62px] animate-pulse rounded-[20px] bg-[#10184c]/50"
+              />
             ))
           ) : (
             <>
               {visibleTasks.map((task) => {
                 const done = isCompleted(task);
                 const deadlineStr = task.deadline
-                  ? new Date(task.deadline).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                  ? new Date(task.deadline).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })
                   : null;
-                const overdue = task.deadline && !done && new Date(task.deadline) < new Date();
+                const overdue =
+                  task.deadline &&
+                  !done &&
+                  new Date(task.deadline) < new Date();
 
                 return (
                   <article
@@ -260,7 +289,9 @@ export default function ToDo() {
                     <button
                       type="button"
                       onClick={() => toggleTask(task)}
-                      aria-label={done ? "Mark task as active" : "Complete task"}
+                      aria-label={
+                        done ? "Mark task as active" : "Complete task"
+                      }
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition ${
                         done
                           ? "border-[#5fffd0]/40 bg-[#5fffd0]/15 text-[#5fffd0]"
@@ -271,14 +302,20 @@ export default function ToDo() {
                     </button>
 
                     <div className="min-w-0 flex-1">
-                      <p className={`break-words ${done ? "text-white/35 line-through" : "text-white/85"}`}>
+                      <p
+                        className={`break-words ${done ? "text-white/35 line-through" : "text-white/85"}`}
+                      >
                         {task.title}
                       </p>
                       {(task.priority || deadlineStr) && (
                         <div className="mt-1 flex flex-wrap items-center gap-2">
-                          {task.priority && <PriorityBadge priority={task.priority} />}
+                          {task.priority && (
+                            <PriorityBadge priority={task.priority} />
+                          )}
                           {deadlineStr && (
-                            <span className={`text-[11px] ${overdue ? "text-red-400" : "text-white/35"}`}>
+                            <span
+                              className={`text-[11px] ${overdue ? "text-red-400" : "text-white/35"}`}
+                            >
                               {overdue ? "⚠ " : ""}Due {deadlineStr}
                             </span>
                           )}
