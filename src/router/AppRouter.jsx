@@ -7,6 +7,11 @@ import Profile from "../pages/Profile/Profile";
 import RecentActivity from "../pages/Profile/RecentActivity";
 import Teams from "../pages/Profile/Teams";
 import Projects from "../pages/Projects/Projects";
+import ProjectForm from "../pages/Projects/ProjectForm";
+import ProjectDetails from "../pages/Projects/ProjectDetails";
+import ProjectKanban from "../pages/Projects/ProjectKanban";
+import ProjectOverview from "../pages/Projects/ProjectOverview";
+import AiAssistant from "../pages/Projects/AiAssistant";
 import Community from "../pages/Community/Community";
 import Chat from "../pages/Chat/Chats";
 import Meetings from "../pages/Meetings/Meetings";
@@ -26,6 +31,11 @@ export default function AppRouter(){
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/summary" element={<Summary />} />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/new" element={<ProjectForm />} />
+        <Route path="/projects/:projectId" element={<ProjectOverview />} />
+        <Route path="/projects/:projectId/details" element={<ProjectDetails />} />
+        <Route path="/projects/:projectId/assistant" element={<AiAssistant />} />
+        <Route path="/projects/:projectId/kanban" element={<ProjectKanban />} />
         <Route path="/community" element={<Community />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/recent-activity" element={<RecentActivity />} />
