@@ -42,7 +42,7 @@ const statusToProgress = (s) => {
 export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [loadingNotif, setLoadingNotif] = useState(true);
-  
+
   const [projectStats, setProjectStats] = useState({ total: 0, active: 0 });
   const [loadingProjects, setLoadingProjects] = useState(true);
 
@@ -67,6 +67,10 @@ export default function Dashboard() {
     toDoPercent: 20,
   });
 
+  // ── Team Discipline — real members + their task-completion % ──────────────
+  const [teamDiscipline, setTeamDiscipline] = useState([]);
+  const [loadingDiscipline, setLoadingDiscipline] = useState(true);
+
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -77,7 +81,7 @@ export default function Dashboard() {
         const decoded = jwtDecode(token);
         const realUserId = decoded._id;
         let companyId = decoded.companyId || decoded.company || (decoded.user && decoded.user.companyId) || localStorage.getItem("companyId");
-        
+
         if (!companyId && decoded.role === "system-admin") {
           companyId = "66391d5bb96fa3ef34a8145b";
           localStorage.setItem("companyId", companyId);
@@ -126,6 +130,7 @@ export default function Dashboard() {
         }
 
         // 2. Projects / Meetings (unchanged)
+        let fetchedProjectsForReuse = [];
         if (companyId) {
           setLoadingProjects(true);
           setLoadingMeetings(true);
@@ -138,6 +143,7 @@ export default function Dashboard() {
             if (response.ok) {
               const resData = await response.json();
               const fetchedProjects = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
+              fetchedProjectsForReuse = fetchedProjects;
               const activeCount = fetchedProjects.filter((p) => (p.progress !== undefined ? p.progress < 100 : true)).length;
               setProjectStats({ total: fetchedProjects.length, active: activeCount });
 
@@ -172,6 +178,7 @@ export default function Dashboard() {
         }
 
         // ── 3. TASKS — personal (my-tasks) + project tasks, merged ──────────────
+        let allProjectTasksForReuse = [];
         setLoadingTasks(true);
         try {
           // Always fetch personal tasks assigned to the logged-in user
@@ -182,25 +189,31 @@ export default function Dashboard() {
           let projectTasks = [];
           if (companyId) {
             try {
-              const projResp = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, { method: "GET", headers });
-              if (projResp.ok) {
-                const projData = await projResp.json();
-                const projects = projData.data || (Array.isArray(projData) ? projData : projData.projects || []);
-                await Promise.all(
-                  projects.map(async (project) => {
-                    const pId = project._id || project.id;
-                    try {
-                      const tResp = await fetch(`https://flowio-backend.vercel.app/api/projects/${pId}/tasks`, { method: "GET", headers });
-                      if (tResp.ok) {
-                        const tData = await tResp.json();
-                        projectTasks = [...projectTasks, ...(tData.data || [])];
-                      }
-                    } catch (e) { /* skip */ }
-                  })
-                );
-              }
+              const projects = fetchedProjectsForReuse.length
+                ? fetchedProjectsForReuse
+                : (await (async () => {
+                    const r = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, { method: "GET", headers });
+                    if (!r.ok) return [];
+                    const d = await r.json();
+                    return d.data || (Array.isArray(d) ? d : d.projects || []);
+                  })());
+
+              await Promise.all(
+                projects.map(async (project) => {
+                  const pId = project._id || project.id;
+                  try {
+                    const tResp = await fetch(`https://flowio-backend.vercel.app/api/projects/${pId}/tasks`, { method: "GET", headers });
+                    if (tResp.ok) {
+                      const tData = await tResp.json();
+                      projectTasks = [...projectTasks, ...(tData.data || [])];
+                    }
+                  } catch (e) { /* skip */ }
+                })
+              );
             } catch (e) { /* skip project tasks if fetch fails */ }
           }
+
+          allProjectTasksForReuse = projectTasks;
 
           // Deduplicate by _id (a task may appear in both lists)
           const seen = new Set();
@@ -247,15 +260,19 @@ export default function Dashboard() {
           setLoadingTasks(false);
         }
 
-        // 4. Teams (unchanged)
+        // 4. Teams + Team Discipline (real members + their task completion %)
         if (companyId) {
           setLoadingTeams(true);
+          setLoadingDiscipline(true);
           try {
             const response = await fetch(`https://flowio-backend.vercel.app/api/teams/company/${companyId}`, { method: "GET", headers });
             if (response.ok) {
               const resData = await response.json();
               const fetchedTeams = resData.data || (Array.isArray(resData) ? resData : resData.teams || []);
               const allMembersIds = new Set();
+
+              // Map of userId -> { name, specialization, total, done }
+              const memberMap = new Map();
 
               if (fetchedTeams.length > 0) {
                 await Promise.all(
@@ -269,10 +286,25 @@ export default function Dashboard() {
                         const membersArray = membersData.data || (Array.isArray(membersData) ? membersData : []);
                         membersArray.forEach((m) => {
                           let uId = null;
-                          if (m.userId && typeof m.userId === "object") uId = m.userId._id || m.userId.id;
-                          else if (m.userId) uId = m.userId;
-                          else uId = m._id || m.id;
-                          if (uId) allMembersIds.add(String(uId));
+                          let name = "Unknown";
+                          let specialization = m.role_in_team || "Member";
+
+                          if (m.userId && typeof m.userId === "object") {
+                            uId = m.userId._id || m.userId.id;
+                            name = m.userId.name || name;
+                            specialization = m.userId.specialization || specialization;
+                          } else if (m.userId) {
+                            uId = m.userId;
+                          } else {
+                            uId = m._id || m.id;
+                          }
+
+                          if (uId) {
+                            allMembersIds.add(String(uId));
+                            if (!memberMap.has(String(uId))) {
+                              memberMap.set(String(uId), { id: String(uId), name, specialization, total: 0, done: 0 });
+                            }
+                          }
                         });
                       }
                     } catch (memberErr) {
@@ -284,12 +316,60 @@ export default function Dashboard() {
               } else {
                 setTeamStats({ total: 0, membersCount: 1 });
               }
+
+              // ── Derive each member's task completion % from project tasks ──
+              // Tasks carry an `assignedTo` field (User ObjectId or populated object).
+              try {
+                allProjectTasksForReuse.forEach((t) => {
+                  let assignedId = null;
+                  if (t.assignedTo && typeof t.assignedTo === "object") {
+                    assignedId = t.assignedTo._id || t.assignedTo.id;
+                  } else if (t.assignedTo) {
+                    assignedId = t.assignedTo;
+                  }
+                  if (!assignedId) return;
+
+                  const key = String(assignedId);
+                  if (!memberMap.has(key)) {
+                    // Member exists in tasks but wasn't found in any team — still show them
+                    memberMap.set(key, {
+                      id: key,
+                      name: (t.assignedTo && t.assignedTo.name) || "Unknown",
+                      specialization: (t.assignedTo && t.assignedTo.specialization) || "Member",
+                      total: 0,
+                      done: 0,
+                    });
+                  }
+
+                  const entry = memberMap.get(key);
+                  entry.total += 1;
+                  if (isDone(t.status)) entry.done += 1;
+                });
+              } catch (e) {
+                console.error("Error computing team discipline:", e);
+              }
+
+              const disciplineList = Array.from(memberMap.values())
+                .map((m) => ({
+                  name: m.name,
+                  role: m.specialization,
+                  percent: m.total > 0 ? Math.round((m.done / m.total) * 100) : 0,
+                  hasTasks: m.total > 0,
+                }))
+                // Show members with tasks first, most active first
+                .sort((a, b) => (b.hasTasks - a.hasTasks) || b.percent - a.percent)
+                .slice(0, 6);
+
+              setTeamDiscipline(disciplineList);
             }
           } catch (err) {
             console.error("Error fetching teams:", err);
           } finally {
             setLoadingTeams(false);
+            setLoadingDiscipline(false);
           }
+        } else {
+          setLoadingDiscipline(false);
         }
 
       } catch (error) {
@@ -299,18 +379,12 @@ export default function Dashboard() {
         setLoadingTeams(false);
         setLoadingTasks(false);
         setLoadingMeetings(false);
+        setLoadingDiscipline(false);
       }
     };
 
     fetchDashboardData();
   }, [token]);
-
-  const employees = [
-    { name: "Justin Lipshutz",    role: "Project Manager",     percent: 100, img: "https://i.pravatar.cc/60?img=12" },
-    { name: "Danielle Lipsham",   role: "UI Designer",          percent: 70,  img: "https://i.pravatar.cc/60?img=32" },
-    { name: "Noah Bernstein",     role: "Frontend Developer",   percent: 65,  img: "https://i.pravatar.cc/60?img=15" },
-    { name: "Ahmed Mohamed",      role: "Backend Developer",    percent: 88,  img: "https://i.pravatar.cc/60?img=22" },
-  ];
 
   const cardClass =
     "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-5 xl:p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
@@ -321,9 +395,6 @@ export default function Dashboard() {
     { icon: <FaCalendarAlt />,    label: "Meetings",  value: loadingMeetings ? "..." : String(meetingStats.total),  sub: `${meetingStats.today} today` },
     { icon: <FaUsers />,          label: "Teams",     value: loadingTeams    ? "..." : String(teamStats.total),     sub: `${teamStats.membersCount} members` },
   ];
-
-  const doneDeg       = (projectProgressStats.donePercent / 100) * 360;
-  const inProgressDeg = doneDeg + (projectProgressStats.inProgressPercent / 100) * 360;
 
   return (
     <MainLayout title="Dashboard">
@@ -362,7 +433,7 @@ export default function Dashboard() {
               <div className="relative mx-auto h-[150px] w-[150px] rounded-full bg-[conic-gradient(#7b5dff_0deg_180deg,#07103a_180deg_186deg,#59d3ff_186deg_258deg,#07103a_258deg_264deg,#d86bff_264deg_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)] lg:h-[175px] lg:w-[175px]">
                 <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[30px] font-extrabold lg:text-[34px]">50%</span>
+                  <span className="text-[30px] font-extrabold lg:text-[34px]">{projectProgressStats.donePercent}%</span>
                   <span className="text-[11px] text-white/65">Completed</span>
                 </div>
               </div>
@@ -424,7 +495,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TEAM DISCIPLINE */}
+          {/* TEAM DISCIPLINE — now driven by real team members + task completion % */}
           <div className={`${cardClass} flex flex-col`}>
             <div className="mb-5 flex shrink-0 items-center justify-between">
               <h3 className="text-[17px] font-bold">Team Discipline</h3>
@@ -434,25 +505,42 @@ export default function Dashboard() {
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
-              {employees.map((emp) => (
-                <div key={emp.name} className="rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img src={emp.img} alt={emp.name} className="h-[42px] w-[42px] rounded-full object-cover ring-2 ring-white/15" />
-                      <div>
-                        <p className="text-[13px] font-bold">{emp.name}</p>
-                        <p className="mt-1 text-[10px] text-white/45">{emp.role}</p>
+              {loadingDiscipline ? (
+                <div className="py-8 text-center text-xs text-white/35">Loading team progress...</div>
+              ) : teamDiscipline.length === 0 ? (
+                <div className="py-8 text-center text-xs text-white/25">No team members found.</div>
+              ) : (
+                teamDiscipline.map((emp) => (
+                  <div key={emp.name} className="rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
+                          {emp.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-bold">{emp.name}</p>
+                          <p className="mt-1 text-[10px] text-white/45 capitalize">{emp.role}</p>
+                        </div>
                       </div>
+                      <span className="text-[12px] font-bold text-[#78aaff]">
+                        {emp.hasTasks ? `${emp.percent}%` : "—"}
+                      </span>
                     </div>
-                    <span className="text-[12px] font-bold text-[#78aaff]">{emp.percent}%</span>
+                    <div className="h-[7px] rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] transition-all duration-500"
+                        style={{ width: `${emp.percent}%` }}
+                      />
+                    </div>
+                    {!emp.hasTasks && (
+                      <p className="mt-2 text-[9px] text-white/30">No tasks assigned yet</p>
+                    )}
                   </div>
-                  <div className="h-[7px] rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff]" style={{ width: `${emp.percent}%` }} />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
+          
 
           {/* NOTIFICATIONS */}
           <div className={`${cardClass} flex flex-col`}>
