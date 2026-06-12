@@ -83,7 +83,7 @@ export default function Dashboard() {
           setLoadingNotif(true);
           try {
             const data = await notificationService.getUserNotifications(realUserId);
-            const serverNotifs = data?.notifications || [];
+            const serverNotifs = data?.data || [];
             const localData = localStorage.getItem("local_notifications");
             const localNotifs = localData ? JSON.parse(localData) : [];
             const allNotifs = [...localNotifs, ...serverNotifs];

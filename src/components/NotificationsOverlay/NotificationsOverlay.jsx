@@ -79,7 +79,7 @@ export default function NotificationsOverlay({ onClose }) {
 
         // 1. جلب إشعارات السيرفر
         const data = await notificationService.getUserNotifications(realUserId);
-        const serverNotifs = data.notifications || [];
+        const serverNotifs = data.data || [];
 
         // 2. جلب الإشعارات المحلية المخزنة بالـ localStorage
         const localData = localStorage.getItem("local_notifications");
