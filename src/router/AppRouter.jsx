@@ -20,6 +20,7 @@ import Notifications from "../pages/Notifications/Notifications";
 import Schedule from "../pages/Schedule/Schedule";
 import ToDo from "../pages/To-Do/To-Do";
 import CompanyOnboarding from "../pages/Onboarding/CompanyOnboarding";
+import TaskForm from "../pages/Projects/TaskForm";
 
 export default function AppRouter(){
   return (
@@ -48,6 +49,7 @@ export default function AppRouter(){
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/to-do" element={<ToDo />} />
         <Route path="/company-onboarding" element={<CompanyOnboarding />} />
+        <Route path="/projects/:projectId/tasks/new" element={<TaskForm />} />
       </Routes>
     </BrowserRouter>
   )
