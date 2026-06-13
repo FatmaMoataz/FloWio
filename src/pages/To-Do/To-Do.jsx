@@ -21,9 +21,10 @@ const STATUS = {
 const PRIORITY = { low: "low", medium: "medium", high: "high" };
 
 const PRIORITY_COLORS = {
-  high: "text-red-400    border-red-400/40    bg-red-400/10",
-  medium: "text-yellow-400 border-yellow-400/40 bg-yellow-400/10",
-  low: "text-green-400  border-green-400/40  bg-green-400/10",
+  high: "flowio-priority-high text-rose-200 border-rose-300/30 bg-rose-400/15",
+  medium:
+    "flowio-priority-medium text-amber-200 border-amber-300/30 bg-amber-400/15",
+  low: "flowio-priority-low text-sky-200 border-sky-300/30 bg-sky-400/15",
 };
 
 const isCompleted = (task) => task.status === STATUS.done;
@@ -31,7 +32,7 @@ const isCompleted = (task) => task.status === STATUS.done;
 function PriorityBadge({ priority }) {
   return (
     <span
-      className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${PRIORITY_COLORS[priority] ?? ""}`}
+      className={`flowio-priority-badge shrink-0 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${PRIORITY_COLORS[priority] ?? ""}`}
     >
       {priority}
     </span>

@@ -20,9 +20,10 @@ import {
 } from "./projectStore";
 
 const priorityStyles = {
-  Low: "bg-violet-400 text-white",
-  Medium: "bg-emerald-400 text-white",
-  High: "bg-rose-400 text-white",
+  Low: "flowio-priority-low border-sky-300/30 bg-sky-400/15 text-sky-200",
+  Medium:
+    "flowio-priority-medium border-amber-300/30 bg-amber-400/15 text-amber-200",
+  High: "flowio-priority-high border-rose-300/30 bg-rose-400/15 text-rose-200",
 };
 
 function AssistantAvatar({ compact = false }) {
@@ -138,7 +139,7 @@ export default function ProjectOverview() {
                         className="flex w-full items-center gap-2 text-left text-xs"
                       >
                         {isChecked ? <FaCheckSquare className="shrink-0 text-[#a9c7ff]" /> : <FaRegSquare className="shrink-0 text-white/75" />}
-                        <span className={`shrink-0 rounded-full px-4 py-1 text-[9px] ${priorityStyles[task.priority]}`}>{task.priority} Priority</span>
+                        <span className={`flowio-priority-badge shrink-0 rounded-full border px-4 py-1 text-[10px] font-semibold tracking-wide ${priorityStyles[task.priority] || priorityStyles.Medium}`}>{task.priority || "Medium"} Priority</span>
                         <span className="min-w-0 flex-1 truncate text-white/75">{task.name}</span>
                         <span className="flex shrink-0 items-center gap-2 text-[10px] text-white/55">
                           <span className="h-2.5 w-2.5 rounded-full bg-white/70" />

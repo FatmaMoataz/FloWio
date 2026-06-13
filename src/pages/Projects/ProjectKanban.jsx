@@ -16,9 +16,10 @@ const COLUMNS = [
 ];
 
 const priorityStyles = {
-  Low: "bg-violet-400/15 text-violet-300",
-  Medium: "bg-emerald-400/15 text-emerald-300",
-  High: "bg-rose-400/15 text-rose-300",
+  Low: "flowio-priority-low border-sky-300/30 bg-sky-400/15 text-sky-200",
+  Medium:
+    "flowio-priority-medium border-amber-300/30 bg-amber-400/15 text-amber-200",
+  High: "flowio-priority-high border-rose-300/30 bg-rose-400/15 text-rose-200",
 };
 
 export default function ProjectKanban() {
@@ -96,7 +97,7 @@ export default function ProjectKanban() {
 
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         <span
-                          className={`rounded-full px-3 py-1 text-[9px] ${
+                          className={`flowio-priority-badge rounded-full border px-3 py-1 text-[10px] font-semibold tracking-wide ${
                             priorityStyles[task.priority] ||
                             priorityStyles.Medium
                           }`}
