@@ -289,45 +289,105 @@ export default function Community() {
     }
   };
 
-  const addPoll = async (e) => {
-    e.preventDefault();
-    const trimmedQuestion = pollText.trim();
-    const formattedOptions = pollOptions
-      .map((opt) => opt.trim())
-      .filter(Boolean)
-      .map((text) => ({ text }));
+// const addPoll = async (e) => {
+//   e.preventDefault();
+//   const trimmedQuestion = pollText.trim();
+  
+//   // Only send the text for each option, no extra fields
+//   const formattedOptions = pollOptions
+//     .map((opt) => opt.trim())
+//     .filter(Boolean)
+//     .map((text) => ({ text })); // ← Only { text } - no extra fields
 
-    if (!trimmedQuestion) return setPollError("Question is required.");
-    if (formattedOptions.length < 2) return setPollError("At least 2 options required.");
+//   if (!trimmedQuestion) return setPollError("Question is required.");
+//   if (formattedOptions.length < 2) return setPollError("At least 2 options required.");
 
-    const toastId = toast.loading("Creating poll...");
-    try {
-      await API.post("/api/posts", {
-        content: trimmedQuestion,
-        pollData: { 
-          question: trimmedQuestion, 
-          options: formattedOptions,
-          totalVotes: 0
-        },
-      });
-      closePollModal();
-      await fetchPosts(true);
-      toast.update(toastId, {
-        render: "Poll created!",
-        type: "success",
-        isLoading: false,
-        autoClose: 2500,
-      });
-    } catch {
-      closePollModal();
-      toast.update(toastId, {
-        render: "Failed to create poll.",
-        type: "error",
-        isLoading: false,
-        autoClose: 3000,
-      });
+//   const toastId = toast.loading("Creating poll...");
+//   try {
+//     await API.post("/api/posts", {
+//       content: trimmedQuestion,
+//       pollData: { 
+//         question: trimmedQuestion, 
+//         options: formattedOptions  // ← Send only { text } objects
+//       },
+//     });
+//     closePollModal();
+//     await fetchPosts(true);
+//     toast.update(toastId, {
+//       render: "Poll created!",
+//       type: "success",
+//       isLoading: false,
+//       autoClose: 2500,
+//     });
+//   } catch (error) {
+//     console.error("Poll creation error:", error.response?.data);
+//     closePollModal();
+//     toast.update(toastId, {
+//       render: error.response?.data?.message || "Failed to create poll.",
+//       type: "error",
+//       isLoading: false,
+//       autoClose: 3000,
+//     });
+//   }
+// };
+
+const addPoll = async (e) => {
+  e.preventDefault();
+  const trimmedQuestion = pollText.trim();
+  
+  // Clean options - only send text, no extra fields
+  const formattedOptions = pollOptions
+    .map((opt) => opt.trim())
+    .filter(Boolean)
+    .map((text) => ({ text }));
+
+  if (!trimmedQuestion) {
+    setPollError("Question is required.");
+    return;
+  }
+  
+  if (formattedOptions.length < 2) {
+    setPollError("At least 2 options required.");
+    return;
+  }
+
+  // Create the promise
+  const createPollPromise = API.post("/api/posts", {
+    content: trimmedQuestion,
+    pollData: { 
+      question: trimmedQuestion, 
+      options: formattedOptions
+    },
+  });
+
+  // Use toast.promise to handle all states
+  toast.promise(createPollPromise, {
+    pending: "Creating poll...",
+    success: {
+      render() {
+        closePollModal();
+        fetchPosts(true);
+        return "Poll created successfully!";
+      },
+      autoClose: 2500,
+    },
+    error: {
+      render({ data }) {
+        const errorMessage = data?.response?.data?.message || "Failed to create poll.";
+        setPollError(errorMessage);
+        return errorMessage;
+      },
+      autoClose: 3000,
     }
-  };
+  });
+
+  try {
+    await createPollPromise;
+  } catch (error) {
+    // Error is already handled by toast.promise
+    console.error("Poll creation failed:", error);
+  }
+};
 
   const updatePollOption = (index, value) =>
     setPollOptions((prev) => prev.map((opt, idx) => (idx === index ? value : opt)));
