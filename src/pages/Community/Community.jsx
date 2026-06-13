@@ -23,7 +23,6 @@ const formatRole = (role) => {
 };
 
 export default function Community() {
-  // Pull userId fresh — trim whitespace defensively
   const currentUserId = (localStorage.getItem("userId") || "").trim();
 
   const currentUserInfo = {
@@ -63,27 +62,10 @@ export default function Community() {
     }
   };
 
-  // useEffect(() => {
-  //   fetchPosts();
-  // }, []);
   useEffect(() => {
-  const syncAvatar = async () => {
-    try {
-      const user = await userService.getCurrentUser();
-      if (user.avatar) localStorage.setItem("userAvatar", user.avatar);
-      if (user.name) localStorage.setItem("userName", user.name);
-      if (user.role) localStorage.setItem("userRole", user.role);
-    } catch {}
-  };
-  syncAvatar();
-  fetchPosts();
-}, []);
+    fetchPosts();
+  }, []);
 
-  // ── Ownership check — the root cause of the disabled delete button ───────────
-  // post.userId can be:
-  //   (a) a populated object  → { _id: "abc123", name: "..." }
-  //   (b) a plain ObjectId string → "abc123"
-  // We extract the raw string in both cases and compare to currentUserId.
   const isPostOwner = (post) => {
     if (!currentUserId) return false;
     const rawId =
@@ -93,7 +75,6 @@ export default function Community() {
     return rawId.trim() === currentUserId;
   };
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
   const resolveAvatar = (userField) => {
     if (typeof userField === "object" && userField?.avatar) return userField.avatar;
     const uid =
@@ -119,7 +100,6 @@ export default function Community() {
     return "Team Member";
   };
 
-  // ── Add plain post ───────────────────────────────────────────────────────────
   const addPost = async (e) => {
     e.preventDefault();
     const trimmed = postText.trim();
@@ -146,14 +126,12 @@ export default function Community() {
     }
   };
 
-  // ── Like / Unlike — optimistic update ───────────────────────────────────────
   const toggleLike = async (post) => {
     const postId = post._id;
     if (!postId) return;
 
     const isLiked = post.likes?.map(String).includes(currentUserId);
 
-    // Flip immediately in UI
     setPosts((prev) =>
       prev.map((p) => {
         if (p._id !== postId) return p;
@@ -173,7 +151,6 @@ export default function Community() {
         await API.post(`/api/posts/${postId}/like`);
       }
     } catch {
-      // Revert on failure
       setPosts((prev) =>
         prev.map((p) => {
           if (p._id !== postId) return p;
@@ -189,7 +166,6 @@ export default function Community() {
     }
   };
 
-  // ── Delete post ──────────────────────────────────────────────────────────────
   const deletePost = async (postId) => {
     if (!postId) return;
 
@@ -199,7 +175,6 @@ export default function Community() {
 
     try {
       await API.delete(`/api/posts/${postId}`);
-      // Remove from local state immediately — no refetch needed
       setPosts((prev) => prev.filter((p) => p._id !== postId));
       toast.update(toastId, {
         render: "Post deleted.",
@@ -219,7 +194,6 @@ export default function Community() {
     }
   };
 
-  // ── Add comment ──────────────────────────────────────────────────────────────
   const addComment = async (event, postId) => {
     event.preventDefault();
     if (!postId) return;
@@ -235,9 +209,45 @@ export default function Community() {
     }
   };
 
-  // ── Vote ─────────────────────────────────────────────────────────────────────
   const handleVote = async (pollId, option, postId) => {
     if (!pollId || !option || !postId) return;
+
+    // Optimistic update
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p._id !== postId) return p;
+        
+        const currentPoll = p.pollId || p.pollData;
+        if (!currentPoll) return p;
+        
+        const totalVotes = (currentPoll.totalVotes || 0) + 1;
+        const updatedOptions = currentPoll.options.map((opt) => {
+          if (opt.text === option.text) {
+            const newVoteCount = (opt.voteCount || 0) + 1;
+            return {
+              ...opt,
+              voteCount: newVoteCount,
+              votedByMe: true,
+              percentage: Math.round((newVoteCount / totalVotes) * 100)
+            };
+          }
+          const currentCount = opt.voteCount || 0;
+          return {
+            ...opt,
+            percentage: totalVotes > 0 ? Math.round((currentCount / totalVotes) * 100) : 0
+          };
+        });
+        
+        return {
+          ...p,
+          pollId: {
+            ...currentPoll,
+            options: updatedOptions,
+            totalVotes: totalVotes
+          }
+        };
+      })
+    );
 
     try {
       const response = await API.post("/api/polls/vote", {
@@ -250,13 +260,26 @@ export default function Community() {
       if (response.data?.data) {
         const updatedPoll = response.data.data;
         setPosts((prev) =>
-          prev.map((p) => (p._id === postId ? { ...p, pollId: updatedPoll } : p))
+          prev.map((p) => 
+            p._id === postId 
+              ? { 
+                  ...p, 
+                  pollId: {
+                    ...updatedPoll,
+                    options: updatedPoll.options.map(opt => ({
+                      ...opt,
+                      votedByMe: opt.votedByMe || (opt.text === option.text)
+                    }))
+                  } 
+                }
+              : p
+          )
         );
         toast.success("Vote recorded!");
-      } else {
-        await fetchPosts(true);
       }
+      
     } catch (err) {
+      await fetchPosts(true);
       const msg = err.response?.data?.message;
       if (msg === "You have already voted in this poll!") {
         toast.info("You already voted on this poll.");
@@ -266,7 +289,6 @@ export default function Community() {
     }
   };
 
-  // ── Create poll post ─────────────────────────────────────────────────────────
   const addPoll = async (e) => {
     e.preventDefault();
     const trimmedQuestion = pollText.trim();
@@ -282,7 +304,11 @@ export default function Community() {
     try {
       await API.post("/api/posts", {
         content: trimmedQuestion,
-        pollData: { question: trimmedQuestion, options: formattedOptions },
+        pollData: { 
+          question: trimmedQuestion, 
+          options: formattedOptions,
+          totalVotes: 0
+        },
       });
       closePollModal();
       await fetchPosts(true);
@@ -313,7 +339,6 @@ export default function Community() {
     setPollError("");
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <MainLayout title="Community">
       <ToastContainer
@@ -331,7 +356,6 @@ export default function Community() {
       />
 
       <div className="relative h-full min-h-0 overflow-y-auto text-white lg:pr-2">
-        {/* Backdrop for open menus */}
         {openMenuId && (
           <button
             type="button"
@@ -341,8 +365,7 @@ export default function Community() {
         )}
 
         <div className="mx-auto flex w-full max-w-[820px] flex-col">
-
-          {/* ── Compose box ── */}
+          {/* Compose box */}
           <div className="mx-auto mb-7 flex w-full max-w-[760px] items-start gap-3 sm:items-center sm:gap-4">
             <img
               src={currentUserInfo.avatar}
@@ -376,14 +399,12 @@ export default function Community() {
             </form>
           </div>
 
-          {/* ── Loading state ── */}
           {isLoading && (
             <p className="py-10 text-center text-sm text-white/55">
               Loading community data...
             </p>
           )}
 
-          {/* ── Posts feed ── */}
           {!isLoading && (
             <div className="space-y-5">
               {posts.length === 0 && (
@@ -399,10 +420,9 @@ export default function Community() {
                 const isOwner = isPostOwner(post);
                 const isLiked = post.likes?.map(String).includes(currentUserId);
                 const isDeleting = deletingId === postId;
-                const activePoll =
-                  post.pollId && typeof post.pollId === "object"
-                    ? post.pollId
-                    : post.pollData || null;
+                const activePoll = post.pollId && typeof post.pollId === "object"
+                  ? post.pollId
+                  : post.pollData || null;
 
                 return (
                   <article
@@ -411,7 +431,7 @@ export default function Community() {
                       openMenuId === postId ? "z-20" : "z-0"
                     } ${isDeleting ? "pointer-events-none opacity-40" : ""}`}
                   >
-                    {/* ── Post header ── */}
+                    {/* Post header */}
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <img
@@ -429,14 +449,11 @@ export default function Community() {
                         </div>
                       </div>
 
-                      {/* 3-dot menu — only rendered for post owner */}
                       {isOwner && (
                         <div className="relative">
                           <button
                             type="button"
-                            onClick={() =>
-                              setOpenMenuId(openMenuId === postId ? null : postId)
-                            }
+                            onClick={() => setOpenMenuId(openMenuId === postId ? null : postId)}
                             className="flex h-8 w-8 items-center justify-center rounded-full text-white/65 transition hover:bg-white/10 hover:text-white"
                           >
                             <FaEllipsisH size={14} />
@@ -458,51 +475,34 @@ export default function Community() {
                       )}
                     </div>
 
-                    {/* ── Post content ── */}
+                    {/* Post content */}
                     <p className="mt-5 text-[13px] leading-relaxed text-white/85">
                       {post.content}
                     </p>
 
-                    {/* ── Poll ── */}
-                    {activePoll && (
+                    {/* Poll */}
+                    {activePoll && activePoll.options && (
                       <div className="mt-4 space-y-2">
                         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#64CFFF]/80">
                           📊 {activePoll.question}
                         </p>
-                        {activePoll.options?.map((option, idx) => {
-                          const totalVotes =
-                            activePoll.totalVotes ??
-                            activePoll.options.reduce(
-                              (sum, o) => sum + (o.votes?.length || 0),
-                              0
-                            );
-                          const voteCount =
-                            option.voteCount ?? option.votes?.length ?? 0;
-                          const percentage =
-                            option.percentage ??
-                            (totalVotes > 0
-                              ? Math.round((voteCount / totalVotes) * 100)
-                              : 0);
-                          const votedByMe =
-                            option.votedByMe ??
-                            option.votes?.map(String).includes(currentUserId);
+                        {activePoll.options.map((option, idx) => {
+                          const totalVotes = activePoll.totalVotes || 0;
+                          const voteCount = option.voteCount || 0;
+                          const percentage = option.percentage || (totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0);
+                          const votedByMe = option.votedByMe || false;
 
                           return (
                             <button
                               key={option._id || idx}
                               type="button"
-                              onClick={() =>
-                                handleVote(
-                                  activePoll._id || activePoll.id,
-                                  option,
-                                  postId
-                                )
-                              }
+                              onClick={() => handleVote(activePoll._id || activePoll.id, option, postId)}
                               className={`relative h-11 w-full overflow-hidden rounded-xl border px-4 text-left text-xs transition ${
                                 votedByMe
                                   ? "border-[#64CFFF]/50 bg-[#64CFFF]/10 text-white"
                                   : "border-white/10 bg-white/[0.04] text-white/75 hover:border-[#64CFFF]/40 hover:bg-[#64CFFF]/5"
                               }`}
+                              disabled={votedByMe}
                             >
                               <div
                                 className="absolute inset-y-0 left-0 rounded-xl bg-[#64CFFF]/10 transition-all duration-500"
@@ -510,17 +510,13 @@ export default function Community() {
                               />
                               <span className="relative z-10 flex w-full items-center justify-between gap-3">
                                 <span className="flex items-center gap-2">
-                                  {votedByMe && (
-                                    <span className="text-[#64CFFF]">✓</span>
-                                  )}
+                                  {votedByMe && <span className="text-[#64CFFF]">✓</span>}
                                   {option.text}
                                 </span>
                                 {totalVotes > 0 && (
                                   <span className="text-[10px] font-bold text-white/50">
                                     {percentage}%
-                                    <span className="ml-1 text-white/30">
-                                      ({voteCount})
-                                    </span>
+                                    <span className="ml-1 text-white/30">({voteCount})</span>
                                   </span>
                                 )}
                               </span>
@@ -529,51 +525,38 @@ export default function Community() {
                         })}
                         {(activePoll.totalVotes ?? 0) > 0 && (
                           <p className="pt-1 text-[10px] text-white/30">
-                            {activePoll.totalVotes} vote
-                            {activePoll.totalVotes !== 1 ? "s" : ""}
+                            {activePoll.totalVotes} vote{activePoll.totalVotes !== 1 ? "s" : ""}
                           </p>
                         )}
                       </div>
                     )}
 
-                    {/* ── Like / comment row ── */}
+                    {/* Like / comment row */}
                     <div className="mt-4 flex items-center justify-between">
                       <div className="flex items-center gap-5">
                         <button
                           type="button"
                           onClick={() => toggleLike(post)}
                           className={`flex items-center gap-1.5 text-lg transition ${
-                            isLiked
-                              ? "text-pink-400"
-                              : "text-white/60 hover:text-pink-400"
+                            isLiked ? "text-pink-400" : "text-white/60 hover:text-pink-400"
                           }`}
                         >
                           {isLiked ? <FaHeart /> : <FaRegHeart />}
                           {(post.likes || []).length > 0 && (
-                            <span className="text-xs font-bold">
-                              {(post.likes || []).length}
-                            </span>
+                            <span className="text-xs font-bold">{(post.likes || []).length}</span>
                           )}
                         </button>
 
                         <button
                           type="button"
-                          onClick={() =>
-                            setOpenCommentsId(
-                              openCommentsId === postId ? null : postId
-                            )
-                          }
+                          onClick={() => setOpenCommentsId(openCommentsId === postId ? null : postId)}
                           className={`flex items-center gap-1.5 text-lg transition ${
-                            openCommentsId === postId
-                              ? "text-cyan-400"
-                              : "text-white/60 hover:text-cyan-400"
+                            openCommentsId === postId ? "text-cyan-400" : "text-white/60 hover:text-cyan-400"
                           }`}
                         >
                           <FaRegComment />
                           {(post.comments || []).length > 0 && (
-                            <span className="text-xs font-bold">
-                              {(post.comments || []).length}
-                            </span>
+                            <span className="text-xs font-bold">{(post.comments || []).length}</span>
                           )}
                         </button>
                       </div>
@@ -588,13 +571,10 @@ export default function Community() {
                       </span>
                     </div>
 
-                    {/* ── Comments section ── */}
+                    {/* Comments section */}
                     {openCommentsId === postId && (
                       <div className="mt-4 border-t border-white/10 pt-4">
-                        <form
-                          onSubmit={(e) => addComment(e, postId)}
-                          className="flex items-center gap-2 sm:gap-3"
-                        >
+                        <form onSubmit={(e) => addComment(e, postId)} className="flex items-center gap-2 sm:gap-3">
                           <img
                             src={currentUserInfo.avatar}
                             alt=""
@@ -660,7 +640,7 @@ export default function Community() {
           )}
         </div>
 
-        {/* ── Poll creation modal ── */}
+        {/* Poll creation modal */}
         {isPollOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-[26px] border border-white/10 bg-gradient-to-br from-[#16206d] to-[#0d1448] p-6 text-white shadow-2xl">
@@ -702,9 +682,7 @@ export default function Community() {
                       {pollOptions.length > 2 && (
                         <button
                           type="button"
-                          onClick={() =>
-                            setPollOptions((prev) => prev.filter((_, i) => i !== index))
-                          }
+                          onClick={() => setPollOptions((prev) => prev.filter((_, i) => i !== index))}
                           className="flex-shrink-0 text-white/30 transition hover:text-[#ff6b8a]"
                         >
                           <FaTimes size={12} />
