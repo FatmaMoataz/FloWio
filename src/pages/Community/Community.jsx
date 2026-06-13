@@ -63,9 +63,21 @@ export default function Community() {
     }
   };
 
+  // useEffect(() => {
+  //   fetchPosts();
+  // }, []);
   useEffect(() => {
-    fetchPosts();
-  }, []);
+  const syncAvatar = async () => {
+    try {
+      const user = await userService.getCurrentUser();
+      if (user.avatar) localStorage.setItem("userAvatar", user.avatar);
+      if (user.name) localStorage.setItem("userName", user.name);
+      if (user.role) localStorage.setItem("userRole", user.role);
+    } catch {}
+  };
+  syncAvatar();
+  fetchPosts();
+}, []);
 
   // ── Ownership check — the root cause of the disabled delete button ───────────
   // post.userId can be:

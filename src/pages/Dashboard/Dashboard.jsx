@@ -116,9 +116,21 @@ function MemberTaskCard({ person }) {
         className="flex w-full items-center gap-3 p-4 text-left"
       >
         {/* Avatar */}
-        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
+        {/* <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
           {person.name.charAt(0)}
-        </div>
+        </div> */}
+        {/* Avatar */}
+{person.avatar ? (
+  <img
+    src={person.avatar}
+    alt={person.name}
+    className="h-[42px] w-[42px] shrink-0 rounded-full object-cover ring-2 ring-white/15"
+  />
+) : (
+  <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
+    {person.name.charAt(0)}
+  </div>
+)}
 
         {/* Name + role */}
         <div className="min-w-0 flex-1">
@@ -449,6 +461,7 @@ export default function Dashboard() {
                       let userId   = null;
                       let userName = "Unknown";
                       let userRole = "Team Member";
+                      let userAvatar = null;
 
                       if (member.userId && typeof member.userId === "object") {
                         userId   = String(member.userId._id || member.userId.id || "");
@@ -458,6 +471,8 @@ export default function Dashboard() {
                                    member.role_in_team ||
                                    member.userId.role ||
                                    "Team Member";
+                        userAvatar = member.userId.avatar || null;
+
                       } else if (member.userId) {
                         userId = String(member.userId);
                       } else if (member._id || member.id) {
@@ -469,7 +484,7 @@ export default function Dashboard() {
                       if (!userId) return;
 
                       if (!personMap.has(userId)) {
-                        personMap.set(userId, { id: userId, name: userName, role: userRole, tasks: [] });
+                        personMap.set(userId, { id: userId, name: userName, role: userRole, tasks: [], avatar: userAvatar });
                       } else {
                         // Enrich existing entry if we now have better data
                         const existing = personMap.get(userId);
@@ -529,6 +544,7 @@ export default function Dashboard() {
                     doneCount,
                     hasTasks:  total > 0,
                     tasks:     person.tasks, // full task objects for the to-do list
+                    avatar:    person.avatar || null,
                   };
                 })
                 .sort((a, b) => {

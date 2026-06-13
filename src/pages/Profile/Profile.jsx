@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 import { jwtDecode } from "jwt-decode"; 
+import userService from "../../services/userService";
 
 import {
   FaLaptopCode,
@@ -52,38 +53,38 @@ export default function Profile() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        
-        let companyId = decoded.companyId || decoded.company || localStorage.getItem("companyId");
-        if (!companyId && decoded.role === "system-admin") {
-          companyId = "66391d5bb96fa3ef34a8145b"; 
-          localStorage.setItem("companyId", companyId);
+  const token = localStorage.getItem("token");
+  if (token) {
+    try {
+      const decoded = jwtDecode(token);
+
+      let companyId = decoded.companyId || decoded.company || localStorage.getItem("companyId");
+      if (!companyId && decoded.role === "system-admin") {
+        companyId = "66391d5bb96fa3ef34a8145b";
+        localStorage.setItem("companyId", companyId);
+      }
+
+      // Fetch real user profile (name, email, avatar) from backend
+      const fetchUserProfile = async () => {
+        try {
+          const user = await userService.getCurrentUser();
+          setUserData({
+            name: user.name || "User",
+            email: user.email || "No Email Provided",
+            avatar: user.avatar || "",
+          });
+          // keep localStorage in sync for other pages (Community, etc.)
+          localStorage.setItem("userName", user.name || "");
+          localStorage.setItem("userAvatar", user.avatar || "");
+          localStorage.setItem("userRole", user.role || "");
+        } catch (err) {
+          console.error("Error fetching user profile:", err);
+          setUserData({ name: "Guest User", email: "guest@workspace.com", avatar: "" });
         }
+      };
 
-        // 1. استخراج الإيميل بشكل آمن
-        const userEmail = decoded.email || "";
+      fetchUserProfile();
 
-        // 2. معالجة اسم احتياطي من الإيميل وتجميله (Nour.Ahmed -> Nour Ahmed)
-        const fallbackName = userEmail
-          ? userEmail
-              .split("@")[0]
-              .replace(/[._-]/g, " ")
-              .split(" ")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ")
-          : "User";
-
-        // 3. تحديث الـ State بالاسم المعالج
-        setUserData({
-          name: decoded.name || decoded.username || fallbackName,
-          email: userEmail || "No Email Provided",
-          avatar: decoded.picture || decoded.avatar || decoded.imageUrl || "" 
-        });
-
-        // جلب المشاريع الحقيقية المرتبطة بالشركة لعرضها في البروفايل
         const fetchProfileProjects = async () => {
           try {
             const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
@@ -107,7 +108,6 @@ export default function Profile() {
           }
         };
 
-        // جلب المهام الحقيقية الموكلة للمستخدم لحساب عددها ديناميكياً
         const fetchProfileTasks = async () => {
           try {
             const response = await fetch(`https://flowio-backend.vercel.app/api/tasks/my-tasks`, {
@@ -131,23 +131,17 @@ export default function Profile() {
           }
         };
 
-        fetchProfileProjects();
-        fetchProfileTasks();
-
-      } catch (error) {
-        console.error("Error decoding token in profile:", error);
-        setUserData({ 
-          name: "Guest User", 
-          email: "guest@workspace.com", 
-          avatar: "" 
-        });
-        setLoadingProjects(false);
-        setLoadingTasks(false);
-      }
+      fetchProfileProjects();
+      fetchProfileTasks();
+    } catch (error) {
+      console.error("Error decoding token in profile:", error);
+      setUserData({ name: "Guest User", email: "guest@workspace.com", avatar: "" });
+      setLoadingProjects(false);
+      setLoadingTasks(false);
     }
-  }, []);
-
-  // بيانات الأنشطة والفرق (مؤقتة لحين ربطها بالـ API)
+  }
+}, []);
+  
   const acts = [
     ["Meeting With Sarah", "MEETING", <FaVideo />, "from-[#ff5ea8] to-[#ff3d7f]"],
     ["Client Meeting Q1", "MEETING", <FaComments />, "from-[#5fffd0] to-[#35b7ff]"],

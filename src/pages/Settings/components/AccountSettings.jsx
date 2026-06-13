@@ -6,7 +6,7 @@ import {
 } from "react-icons/fa";
 import userService from "../../../services/userService";
 
-const DEFAULT_AVATAR = "https://i.pravatar.cc/300?img=12";
+// const DEFAULT_AVATAR = "https://i.pravatar.cc/300?img=12";
 
 // ── Cloudinary config (put these in your .env) ────────────────────────────────
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -36,7 +36,8 @@ export default function AccountSettings() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("info");
 
-  const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
+  // const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
+  const [avatar, setAvatar] = useState(null);
   const [pendingAvatarUrl, setPendingAvatarUrl] = useState(null); // staged until Save
 
   const [account, setAccount] = useState({
@@ -64,7 +65,8 @@ export default function AccountSettings() {
           role: user.role || "",
           specialization: user.specialization || "none",
         });
-        setAvatar(user.avatar || DEFAULT_AVATAR);
+        // setAvatar(user.avatar || DEFAULT_AVATAR);
+        setAvatar(user.avatar || null); // null triggers initials fallback
 
         const stored = JSON.parse(localStorage.getItem("flowio-local-profile") || "{}");
         setLocalFields({
@@ -116,18 +118,24 @@ export default function AccountSettings() {
       showMessage("Photo ready — click Save to apply");
     } catch (err) {
       showMessage("Upload failed, please try again", "error");
-      setAvatar(account.avatar || DEFAULT_AVATAR); // revert preview
+      // setAvatar(account.avatar || DEFAULT_AVATAR); // revert preview
+      setAvatar(account.avatar || null);
     } finally {
       setUploadingAvatar(false);
       e.target.value = "";
     }
   };
 
+  // const removeAvatar = () => {
+  //   setAvatar(DEFAULT_AVATAR);
+  //   setPendingAvatarUrl(""); // empty string signals "remove avatar" on save
+  //   showMessage("Photo removed — click Save to apply");
+  // };
   const removeAvatar = () => {
-    setAvatar(DEFAULT_AVATAR);
-    setPendingAvatarUrl(""); // empty string signals "remove avatar" on save
-    showMessage("Photo removed — click Save to apply");
-  };
+  setAvatar(null);
+  setPendingAvatarUrl("");
+  showMessage("Photo removed — click Save to apply");
+};
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const saveAccount = async () => {
@@ -148,7 +156,12 @@ export default function AccountSettings() {
         payload.avatar = pendingAvatarUrl || null;
       }
 
+      // await userService.updateProfile(payload);
       await userService.updateProfile(payload);
+if (pendingAvatarUrl !== null) {
+  localStorage.setItem("userAvatar", pendingAvatarUrl || "");
+}
+setPendingAvatarUrl(null);
       setPendingAvatarUrl(null); // clear staged change
 
       localStorage.setItem("flowio-local-profile", JSON.stringify(localFields));
@@ -174,7 +187,8 @@ export default function AccountSettings() {
         role: user.role || "",
         specialization: user.specialization || "none",
       });
-      setAvatar(user.avatar || DEFAULT_AVATAR);
+      // setAvatar(user.avatar || DEFAULT_AVATAR);
+      setAvatar(user.avatar || null);
       setPendingAvatarUrl(null);
       setLocalFields({ phone: "", linkedin: "", github: "", facebook: "" });
       localStorage.removeItem("flowio-local-profile");
@@ -261,32 +275,41 @@ export default function AccountSettings() {
           </p>
 
           <div className="flex flex-col items-center text-center">
-            <div className="relative mb-5">
-              <img
-                src={avatar}
-                alt="Profile"
-                className="h-[126px] w-[126px] rounded-full border-4 border-blue-300/20 object-cover shadow-[0_0_25px_rgba(95,150,255,.25)]"
-              />
 
-              {/* Upload spinner overlay */}
-              {uploadingAvatar && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+
+<div className="relative mb-5">
+  {/* Avatar: real photo or initials fallback */}
+  {avatar ? (
+    <img
+      src={avatar}
+      alt="Profile"
+      className="h-[126px] w-[126px] rounded-full border-4 border-blue-300/20 object-cover shadow-[0_0_25px_rgba(95,150,255,.25)]"
+    />
+  ) : (
+    <div className="h-[126px] w-[126px] rounded-full border-4 border-blue-300/20 shadow-[0_0_25px_rgba(95,150,255,.25)] bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] flex items-center justify-center text-[42px] font-black uppercase text-white">
+      {(account.fullName || "?").charAt(0)}
+    </div>
+  )}
+
+  {/* rest unchanged: spinner overlay, unsaved badge, camera label */}
+  {uploadingAvatar && ( 
+       <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
                   <FaSpinner className="animate-spin text-xl text-white" />
                 </div>
-              )}
-
-              {/* Pending badge */}
-              {pendingAvatarUrl !== null && !uploadingAvatar && (
-                <div className="absolute -top-1 -right-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-bold text-black">
+   )}
+  {pendingAvatarUrl !== null && !uploadingAvatar && ( 
+        <div className="absolute -top-1 -right-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-bold text-black">
                   unsaved
                 </div>
-              )}
+   )}
+  <label className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)] transition hover:scale-110">
+    <FaCamera />
+    <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" disabled={uploadingAvatar} />
+  </label>
+</div>
 
-              <label className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)] transition hover:scale-110">
-                <FaCamera />
-                <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" disabled={uploadingAvatar} />
-              </label>
-            </div>
+
+
 
             <h4 className="text-[18px] font-bold">{account.fullName || "—"}</h4>
             <p className="mt-1 text-xs text-white/45 capitalize">{account.role}</p>

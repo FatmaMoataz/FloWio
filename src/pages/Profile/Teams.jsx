@@ -495,9 +495,20 @@
                                 <FaTimes />
                               </button>
 
-                              <div className={`mx-auto flex h-[58px] w-[58px] items-center justify-center rounded-full bg-gradient-to-b ${avatarColors[i % 4]} text-2xl text-white`}>
+                              {/* <div className={`mx-auto flex h-[58px] w-[58px] items-center justify-center rounded-full bg-gradient-to-b ${avatarColors[i % 4]} text-2xl text-white`}>
                                 {iconSet[i % 4]}
-                              </div>
+                              </div> */}
+                              {m.userId?.avatar ? (
+  <img
+    src={m.userId.avatar}
+    alt={m.userId?.name || "Member"}
+    className="mx-auto h-[58px] w-[58px] rounded-full object-cover ring-2 ring-white/15"
+  />
+) : (
+  <div className={`mx-auto flex h-[58px] w-[58px] items-center justify-center rounded-full bg-gradient-to-b ${avatarColors[i % 4]} text-[20px] font-black uppercase text-white`}>
+    {(m.userId?.name || "?").charAt(0)}
+  </div>
+)}
                               <h4 className="mt-3 truncate text-[13px] font-bold">{m.userId?.name || "Unknown User"}</h4>
                               <p className="mt-1 truncate text-[10px] text-[#78aaff] font-semibold uppercase tracking-wider">{m.role_in_team}</p>
                               <p className="mt-0.5 truncate text-[9px] text-white/40">{m.userId?.specialization || "Developer"}</p>
