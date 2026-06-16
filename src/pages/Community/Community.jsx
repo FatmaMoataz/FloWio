@@ -66,14 +66,25 @@ export default function Community() {
     fetchPosts();
   }, []);
 
-  const isPostOwner = (post) => {
-    if (!currentUserId) return false;
-    const rawId =
-      typeof post.userId === "object" && post.userId !== null
-        ? String(post.userId._id || "")
-        : String(post.userId || "");
-    return rawId.trim() === currentUserId;
-  };
+  // const isPostOwner = (post) => {
+  //   if (!currentUserId) return false;
+  //   const rawId =
+  //     typeof post.userId === "object" && post.userId !== null
+  //       ? String(post.userId._id || "")
+  //       : String(post.userId || "");
+  //   return rawId.trim() === currentUserId;
+  // };
+const isPostOwner = (post) => {
+  if (!currentUserId) return false;
+
+  const userField = post.userId;
+  const rawId =
+    typeof userField === "object" && userField !== null
+      ? String(userField._id || userField.id || "")
+      : String(userField || "");
+
+  return rawId.trim() !== "" && rawId.trim() === currentUserId;
+};
 
   const resolveAvatar = (userField) => {
     if (typeof userField === "object" && userField?.avatar) return userField.avatar;
@@ -126,45 +137,104 @@ export default function Community() {
     }
   };
 
-  const toggleLike = async (post) => {
-    const postId = post._id;
-    if (!postId) return;
+  // const toggleLike = async (post) => {
+  //   const postId = post._id;
+  //   if (!postId) return;
 
-    const isLiked = post.likes?.map(String).includes(currentUserId);
+  //   const isLiked = post.likes?.map(String).includes(currentUserId);
 
+  //   setPosts((prev) =>
+  //     prev.map((p) => {
+  //       if (p._id !== postId) return p;
+  //       return {
+  //         ...p,
+  //         likes: isLiked
+  //           ? (p.likes || []).filter((id) => String(id) !== currentUserId)
+  //           : [...(p.likes || []), currentUserId],
+  //       };
+  //     })
+  //   );
+
+  //   try {
+  //     if (isLiked) {
+  //       await API.delete(`/api/posts/${postId}/like`);
+  //     } else {
+  //       await API.post(`/api/posts/${postId}/like`);
+  //     }
+  //   } catch {
+  //     setPosts((prev) =>
+  //       prev.map((p) => {
+  //         if (p._id !== postId) return p;
+  //         return {
+  //           ...p,
+  //           likes: isLiked
+  //             ? [...(p.likes || []), currentUserId]
+  //             : (p.likes || []).filter((id) => String(id) !== currentUserId),
+  //         };
+  //       })
+  //     );
+  //     toast.error("Could not update like. Try again.");
+  //   }
+  // };
+const toggleLike = async (post) => {
+  const postId = post._id;
+  if (!postId) return;
+
+  const isLiked = (post.likes || []).some((like) => {
+    const likeId =
+      typeof like === "object" && like !== null
+        ? String(like._id || like.id || "")
+        : String(like || "");
+    return likeId === currentUserId;
+  });
+
+  // Optimistic update
+  setPosts((prev) =>
+    prev.map((p) => {
+      if (p._id !== postId) return p;
+      return {
+        ...p,
+        likes: isLiked
+          ? (p.likes || []).filter((id) => {
+              const likeId =
+                typeof id === "object" && id !== null
+                  ? String(id._id || id.id || "")
+                  : String(id || "");
+              return likeId !== currentUserId;
+            })
+          : [...(p.likes || []), currentUserId],
+      };
+    })
+  );
+
+  try {
+    if (isLiked) {
+      await API.delete(`/api/posts/${postId}/like`);
+    } else {
+      await API.post(`/api/posts/${postId}/like`);
+    }
+  } catch {
+    // Revert on failure
     setPosts((prev) =>
       prev.map((p) => {
         if (p._id !== postId) return p;
         return {
           ...p,
           likes: isLiked
-            ? (p.likes || []).filter((id) => String(id) !== currentUserId)
-            : [...(p.likes || []), currentUserId],
+            ? [...(p.likes || []), currentUserId]
+            : (p.likes || []).filter((id) => {
+                const likeId =
+                  typeof id === "object" && id !== null
+                    ? String(id._id || id.id || "")
+                    : String(id || "");
+                return likeId !== currentUserId;
+              }),
         };
       })
     );
-
-    try {
-      if (isLiked) {
-        await API.delete(`/api/posts/${postId}/like`);
-      } else {
-        await API.post(`/api/posts/${postId}/like`);
-      }
-    } catch {
-      setPosts((prev) =>
-        prev.map((p) => {
-          if (p._id !== postId) return p;
-          return {
-            ...p,
-            likes: isLiked
-              ? [...(p.likes || []), currentUserId]
-              : (p.likes || []).filter((id) => String(id) !== currentUserId),
-          };
-        })
-      );
-      toast.error("Could not update like. Try again.");
-    }
-  };
+    toast.error("Could not update like. Try again.");
+  }
+};
 
   const deletePost = async (postId) => {
     if (!postId) return;
@@ -501,7 +571,14 @@ const addPoll = async (e) => {
                 if (!postId) return null;
 
                 const isOwner = isPostOwner(post);
-                const isLiked = post.likes?.map(String).includes(currentUserId);
+                // const isLiked = post.likes?.map(String).includes(currentUserId);
+                const isLiked = (post.likes || []).some((like) => {
+  const likeId =
+    typeof like === "object" && like !== null
+      ? String(like._id || like.id || "")
+      : String(like || "");
+  return likeId === currentUserId;
+});
                 const isDeleting = deletingId === postId;
                 const activePoll = post.pollId && typeof post.pollId === "object"
                   ? post.pollId
