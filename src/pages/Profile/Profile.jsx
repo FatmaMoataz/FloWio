@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 import { jwtDecode } from "jwt-decode"; 
 import userService from "../../services/userService";
+import API from "../../services/api";
 
 import {
   FaLaptopCode,
@@ -29,15 +30,15 @@ export default function Profile() {
     avatar: "" 
   });
   
-  // دمج المشاريع الحقيقية في الـ State بدل من البيانات الثابتة
   const [realProjects, setRealProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
-
-  // الـ State الجديدة لجلب عدد المهام الحقيقية ديناميكياً من الـ API
   const [taskCount, setTaskCount] = useState(0);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  
+  // New state for teams
+  const [teams, setTeams] = useState([]);
+  const [loadingTeams, setLoadingTeams] = useState(true);
 
-  // دالة لتحديد الأيقونة والألوان ديناميكياً بناءً على اسم المشروع الحقيقي
   const getProjectStyle = (title = "") => {
     const lowerTitle = title.toLowerCase();
     if (lowerTitle.includes("web") || lowerTitle.includes("design")) {
@@ -52,38 +53,80 @@ export default function Profile() {
     return { icon: <FaProjectDiagram />, color: "from-[#5fffd0] to-[#35b7ff]" };
   };
 
-  useEffect(() => {
-  const token = localStorage.getItem("token");
-  if (token) {
+  // Fetch user's teams
+  const fetchUserTeams = async (companyId, token) => {
     try {
-      const decoded = jwtDecode(token);
-
-      let companyId = decoded.companyId || decoded.company || localStorage.getItem("companyId");
-      if (!companyId && decoded.role === "system-admin") {
-        companyId = "66391d5bb96fa3ef34a8145b";
-        localStorage.setItem("companyId", companyId);
-      }
-
-      // Fetch real user profile (name, email, avatar) from backend
-      const fetchUserProfile = async () => {
-        try {
-          const user = await userService.getCurrentUser();
-          setUserData({
-            name: user.name || "User",
-            email: user.email || "No Email Provided",
-            avatar: user.avatar || "",
-          });
-          // keep localStorage in sync for other pages (Community, etc.)
-          localStorage.setItem("userName", user.name || "");
-          localStorage.setItem("userAvatar", user.avatar || "");
-          localStorage.setItem("userRole", user.role || "");
-        } catch (err) {
-          console.error("Error fetching user profile:", err);
-          setUserData({ name: "Guest User", email: "guest@workspace.com", avatar: "" });
+      const response = await API.get(`/api/teams/company/${companyId}`, {
+        headers: {
+          "x-auth-token": token,
+          "Authorization": `Bearer ${token}`
         }
-      };
+      });
+      
+      if (response.data.success) {
+        const fetchedTeams = response.data.data;
+        
+        // Fetch members for each team
+        const teamsWithMembers = await Promise.all(
+          fetchedTeams.map(async (team) => {
+            try {
+              const membersRes = await API.get(`/api/teams/${team._id}/members`, {
+                headers: {
+                  "x-auth-token": token,
+                  "Authorization": `Bearer ${token}`
+                }
+              });
+              return {
+                ...team,
+                members: membersRes.data.success ? membersRes.data.data : [],
+                archived: team.archived || false
+              };
+            } catch (err) {
+              console.error(`Error fetching members for team ${team._id}:`, err);
+              return { ...team, members: [], archived: team.archived || false };
+            }
+          })
+        );
+        
+        setTeams(teamsWithMembers);
+      }
+    } catch (err) {
+      console.error("Error fetching teams:", err);
+    } finally {
+      setLoadingTeams(false);
+    }
+  };
 
-      fetchUserProfile();
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+
+        let companyId = decoded.companyId || decoded.company || localStorage.getItem("companyId");
+        if (!companyId && decoded.role === "system-admin") {
+          companyId = "66391d5bb96fa3ef34a8145b";
+          localStorage.setItem("companyId", companyId);
+        }
+
+        const fetchUserProfile = async () => {
+          try {
+            const user = await userService.getCurrentUser();
+            setUserData({
+              name: user.name || "User",
+              email: user.email || "No Email Provided",
+              avatar: user.avatar || "",
+            });
+            localStorage.setItem("userName", user.name || "");
+            localStorage.setItem("userAvatar", user.avatar || "");
+            localStorage.setItem("userRole", user.role || "");
+          } catch (err) {
+            console.error("Error fetching user profile:", err);
+            setUserData({ name: "Guest User", email: "guest@workspace.com", avatar: "" });
+          }
+        };
+
+        fetchUserProfile();
 
         const fetchProfileProjects = async () => {
           try {
@@ -98,7 +141,6 @@ export default function Profile() {
             if (response.ok) {
               const resData = await response.json();
               const fetched = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
-              // عرض أول مشروعين فقط ليناسب تصميم الصفحة المتناسق
               setRealProjects(fetched.slice(0, 2));
             }
           } catch (err) {
@@ -131,34 +173,30 @@ export default function Profile() {
           }
         };
 
-      fetchProfileProjects();
-      fetchProfileTasks();
-    } catch (error) {
-      console.error("Error decoding token in profile:", error);
-      setUserData({ name: "Guest User", email: "guest@workspace.com", avatar: "" });
-      setLoadingProjects(false);
-      setLoadingTasks(false);
+        // Fetch teams using the companyId
+        if (companyId) {
+          fetchUserTeams(companyId, token);
+        }
+
+        fetchProfileProjects();
+        fetchProfileTasks();
+      } catch (error) {
+        console.error("Error decoding token in profile:", error);
+        setUserData({ name: "Guest User", email: "guest@workspace.com", avatar: "" });
+        setLoadingProjects(false);
+        setLoadingTasks(false);
+        setLoadingTeams(false);
+      }
     }
-  }
-}, []);
-  
+  }, []);
+
+  // Static data for recent activity - keeping as is
   const acts = [
     ["Meeting With Sarah", "MEETING", <FaVideo />, "from-[#ff5ea8] to-[#ff3d7f]"],
     ["Client Meeting Q1", "MEETING", <FaComments />, "from-[#5fffd0] to-[#35b7ff]"],
     ["Sarah Sent You A Message", "CHAT MESSAGE", <FaEnvelope />, "from-[#ffb86b] to-[#ff7b54]"],
     ["Meeting 1 Completed", "SUMMARY GENERATED", <FaCheckCircle />, "from-[#d8deea] to-[#9ca8bd]"],
     ["Task Completed", "DONE", <FaTasks />, "from-[#ffd166] to-[#ffb703]"],
-  ];
-
-  const teams = [
-    {
-      name: "Fintio Project Team",
-      members: ["Ahmed Mohamed", "Sarah"],
-    },
-    {
-      name: "Design Team",
-      members: ["Aya", "Laila Omar"],
-    },
   ];
 
   const card =
@@ -311,7 +349,7 @@ export default function Profile() {
             {[
               [<FaChartLine />, "80%", "Progress"],
               [<FaTasks />, loadingTasks ? "..." : `${taskCount}`, "Tasks"],
-              [<FaUsers />, "2", "Teams"],
+              [<FaUsers />, loadingTeams ? "..." : `${teams.length}`, "Teams"],
             ].map((item) => (
               <div
                 key={item[2]}
@@ -327,53 +365,93 @@ export default function Profile() {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {teams.map((team) => (
-              <div key={team.name} className="mb-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[12px] font-bold">{team.name}</span>
-                  <Link
-                    to="/teams"
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-white/5 text-[9px] text-white/70 hover:text-white"
-                  >
-                    <FaPlus />
-                  </Link>
-                </div>
-
-                <div className="space-y-3">
-                  {team.members.map((member, index) => (
+            {loadingTeams ? (
+              <div className="flex h-20 items-center justify-center text-xs text-white/40">
+                Loading teams...
+              </div>
+            ) : teams.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-white/10 p-4 text-center">
+                <p className="text-xs text-white/40">No teams found</p>
+                <Link to="/teams" className="mt-2 text-[10px] text-cyan-400 hover:underline">
+                  Create a team
+                </Link>
+              </div>
+            ) : (
+              teams.slice(0, 2).map((team) => (
+                <div key={team._id} className="mb-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-[12px] font-bold truncate">{team.name}</span>
                     <Link
-                      to="/chat"
-                      key={member}
-                      className="flex items-center justify-between rounded-[18px] bg-[#10184c]/60 p-3 transition hover:bg-[#151f62]"
+                      to="/teams"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-white/5 text-[9px] text-white/70 hover:text-white"
                     >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={`https://i.pravatar.cc/80?img=${index + 20}`}
-                          alt={member}
-                          className="h-9 w-9 rounded-full object-cover ring-2 ring-white/10"
-                        />
-                        <span className="text-[12px] font-medium text-white">
-                          {member}
+                      <FaPlus />
+                    </Link>
+                  </div>
+
+                  <div className="space-y-3">
+                    {team.members && team.members.length > 0 ? (
+                      team.members.slice(0, 2).map((member, index) => (
+                        <Link
+                          to="/chat"
+                          key={member._id || index}
+                          className="flex items-center justify-between rounded-[18px] bg-[#10184c]/60 p-3 transition hover:bg-[#151f62]"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {member.userId?.avatar ? (
+                              <img
+                                src={member.userId.avatar}
+                                alt={member.userId.name || "Member"}
+                                className="h-9 w-9 rounded-full object-cover ring-2 ring-white/10"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-xs font-bold uppercase text-white">
+                                {(member.userId?.name || "?").charAt(0)}
+                              </div>
+                            )}
+                            <span className="text-[12px] font-medium text-white truncate">
+                              {member.userId?.name || "Unknown User"}
+                            </span>
+                          </div>
+
+                          {index === 0 && (
+                            <span className="shrink-0 rounded-full bg-blue-400/15 px-3 py-1 text-[9px] font-bold text-[#73a8ff]">
+                              {member.role_in_team || "Member"}
+                            </span>
+                          )}
+                        </Link>
+                      ))
+                    ) : (
+                      <div className="rounded-[18px] bg-[#10184c]/60 p-3 text-center">
+                        <p className="text-[10px] text-white/40">No members yet</p>
+                      </div>
+                    )}
+                    
+                    {team.members && team.members.length > 2 && (
+                      <div className="text-center">
+                        <span className="text-[10px] text-white/40">
+                          +{team.members.length - 2} more members
                         </span>
                       </div>
-
-                      {index === 1 && (
-                        <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[9px] font-bold text-[#73a8ff]">
-                          online
-                        </span>
-                      )}
-                    </Link>
-                  ))}
+                    )}
+                  </div>
                 </div>
+              ))
+            )}
+            
+            {teams.length > 2 && !loadingTeams && (
+              <div className="text-center text-[10px] text-white/40">
+                +{teams.length - 2} more teams
               </div>
-            ))}
+            )}
           </div>
 
           <Link
             to="/teams"
             className="mt-4 flex h-11 w-full shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#69b5ff] to-[#6178ff] text-[13px] font-bold shadow-[0_0_18px_rgba(95,150,255,.35)] transition hover:brightness-110"
           >
-            See All
+            See All Teams
           </Link>
         </div>
       </div>
