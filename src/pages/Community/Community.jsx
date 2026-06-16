@@ -209,85 +209,108 @@ export default function Community() {
     }
   };
 
-  const handleVote = async (pollId, option, postId) => {
-    if (!pollId || !option || !postId) return;
+const handleVote = async (pollId, option, postId) => {
+  if (!pollId || !option || !postId) return;
 
-    // Optimistic update
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p._id !== postId) return p;
-        
-        const currentPoll = p.pollId || p.pollData;
-        if (!currentPoll) return p;
-        
-        const totalVotes = (currentPoll.totalVotes || 0) + 1;
-        const updatedOptions = currentPoll.options.map((opt) => {
-          if (opt.text === option.text) {
-            const newVoteCount = (opt.voteCount || 0) + 1;
-            return {
-              ...opt,
-              voteCount: newVoteCount,
-              votedByMe: true,
-              percentage: Math.round((newVoteCount / totalVotes) * 100)
-            };
-          }
-          const currentCount = opt.voteCount || 0;
-          return {
-            ...opt,
-            percentage: totalVotes > 0 ? Math.round((currentCount / totalVotes) * 100) : 0
-          };
-        });
-        
-        return {
-          ...p,
-          pollId: {
-            ...currentPoll,
-            options: updatedOptions,
-            totalVotes: totalVotes
-          }
-        };
-      })
-    );
+  try {
+    const response = await API.post("/api/polls/vote", {
+      postId,
+      pollId,
+      optionText: option.text,
+      optionId: option._id || option.id,
+    });
 
-    try {
-      const response = await API.post("/api/polls/vote", {
-        postId,
-        pollId,
-        optionText: option.text,
-        optionId: option._id || option.id,
-      });
-
-      if (response.data?.data) {
-        const updatedPoll = response.data.data;
-        setPosts((prev) =>
-          prev.map((p) => 
-            p._id === postId 
-              ? { 
-                  ...p, 
-                  pollId: {
-                    ...updatedPoll,
-                    options: updatedPoll.options.map(opt => ({
-                      ...opt,
-                      votedByMe: opt.votedByMe || (opt.text === option.text)
-                    }))
-                  } 
-                }
-              : p
-          )
-        );
-        toast.success("Vote recorded!");
-      }
-      
-    } catch (err) {
-      await fetchPosts(true);
-      const msg = err.response?.data?.message;
-      if (msg === "You have already voted in this poll!") {
-        toast.info("You already voted on this poll.");
-      } else {
-        toast.error("Failed to cast vote.");
-      }
+    if (response.data?.data) {
+      const updatedPoll = response.data.data;
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === postId ? { ...p, pollId: updatedPoll } : p
+        )
+      );
+      toast.success(response.data.message || "Vote updated!");
     }
-  };
+  } catch (err) {
+    toast.error("Failed to cast vote.");
+  }
+};
+  //   if (!pollId || !option || !postId) return;
+
+  //   // Optimistic update
+  //   setPosts((prev) =>
+  //     prev.map((p) => {
+  //       if (p._id !== postId) return p;
+        
+  //       const currentPoll = p.pollId || p.pollData;
+  //       if (!currentPoll) return p;
+        
+  //       const totalVotes = (currentPoll.totalVotes || 0) + 1;
+  //       const updatedOptions = currentPoll.options.map((opt) => {
+  //         if (opt.text === option.text) {
+  //           const newVoteCount = (opt.voteCount || 0) + 1;
+  //           return {
+  //             ...opt,
+  //             voteCount: newVoteCount,
+  //             votedByMe: true,
+  //             percentage: Math.round((newVoteCount / totalVotes) * 100)
+  //           };
+  //         }
+  //         const currentCount = opt.voteCount || 0;
+  //         return {
+  //           ...opt,
+  //           percentage: totalVotes > 0 ? Math.round((currentCount / totalVotes) * 100) : 0
+  //         };
+  //       });
+        
+  //       return {
+  //         ...p,
+  //         pollId: {
+  //           ...currentPoll,
+  //           options: updatedOptions,
+  //           totalVotes: totalVotes
+  //         }
+  //       };
+  //     })
+  //   );
+
+  //   try {
+  //     const response = await API.post("/api/polls/vote", {
+  //       postId,
+  //       pollId,
+  //       optionText: option.text,
+  //       optionId: option._id || option.id,
+  //     });
+
+  //     if (response.data?.data) {
+  //       const updatedPoll = response.data.data;
+  //       setPosts((prev) =>
+  //         prev.map((p) => 
+  //           p._id === postId 
+  //             ? { 
+  //                 ...p, 
+  //                 pollId: {
+  //                   ...updatedPoll,
+  //                   options: updatedPoll.options.map(opt => ({
+  //                     ...opt,
+  //                     votedByMe: opt.votedByMe || (opt.text === option.text)
+  //                   }))
+  //                 } 
+  //               }
+  //             : p
+  //         )
+  //       );
+  //       toast.success("Vote recorded!");
+  //     }
+      
+  //   } catch (err) {
+  //     await fetchPosts(true);
+  //     const msg = err.response?.data?.message;
+  //     if (msg === "You have already voted in this poll!") {
+  //       toast.info("You already voted on this poll.");
+  //     } else {
+  //       toast.error("Failed to cast vote.");
+  //     }
+  //   }
+  // };
 
 // const addPoll = async (e) => {
 //   e.preventDefault();
@@ -541,55 +564,59 @@ const addPoll = async (e) => {
                     </p>
 
                     {/* Poll */}
-                    {activePoll && activePoll.options && (
-                      <div className="mt-4 space-y-2">
-                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#64CFFF]/80">
-                          📊 {activePoll.question}
-                        </p>
-                        {activePoll.options.map((option, idx) => {
-                          const totalVotes = activePoll.totalVotes || 0;
-                          const voteCount = option.voteCount || 0;
-                          const percentage = option.percentage || (totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0);
-                          const votedByMe = option.votedByMe || false;
+                  {activePoll && activePoll.options && (
+  <div className="mt-4 space-y-2">
+    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#64CFFF]/80">
+      📊 {activePoll.question}
+    </p>
+    {activePoll.options.map((option, idx) => {
+      const totalVotes = activePoll.totalVotes || 0;
+      const voteCount = option.voteCount || 0;
+      const percentage = option.percentage || 0;
+      const votedByMe = option.votedByMe || false;
 
-                          return (
-                            <button
-                              key={option._id || idx}
-                              type="button"
-                              onClick={() => handleVote(activePoll._id || activePoll.id, option, postId)}
-                              className={`relative h-11 w-full overflow-hidden rounded-xl border px-4 text-left text-xs transition ${
-                                votedByMe
-                                  ? "border-[#64CFFF]/50 bg-[#64CFFF]/10 text-white"
-                                  : "border-white/10 bg-white/[0.04] text-white/75 hover:border-[#64CFFF]/40 hover:bg-[#64CFFF]/5"
-                              }`}
-                              disabled={votedByMe}
-                            >
-                              <div
-                                className="absolute inset-y-0 left-0 rounded-xl bg-[#64CFFF]/10 transition-all duration-500"
-                                style={{ width: `${percentage}%` }}
-                              />
-                              <span className="relative z-10 flex w-full items-center justify-between gap-3">
-                                <span className="flex items-center gap-2">
-                                  {votedByMe && <span className="text-[#64CFFF]">✓</span>}
-                                  {option.text}
-                                </span>
-                                {totalVotes > 0 && (
-                                  <span className="text-[10px] font-bold text-white/50">
-                                    {percentage}%
-                                    <span className="ml-1 text-white/30">({voteCount})</span>
-                                  </span>
-                                )}
-                              </span>
-                            </button>
-                          );
-                        })}
-                        {(activePoll.totalVotes ?? 0) > 0 && (
-                          <p className="pt-1 text-[10px] text-white/30">
-                            {activePoll.totalVotes} vote{activePoll.totalVotes !== 1 ? "s" : ""}
-                          </p>
-                        )}
-                      </div>
-                    )}
+      return (
+        <button
+          key={option._id || idx}
+          type="button"
+          onClick={() => handleVote(activePoll._id || activePoll.id, option, postId)}
+          className={`relative h-11 w-full overflow-hidden rounded-xl border px-4 text-left text-xs transition ${
+            votedByMe
+              ? "border-[#64CFFF]/50 bg-[#64CFFF]/10 text-white"
+              : "border-white/10 bg-white/[0.04] text-white/75 hover:border-[#64CFFF]/40 hover:bg-[#64CFFF]/5"
+          }`}
+        >
+          <div
+            className="absolute inset-y-0 left-0 rounded-xl bg-[#64CFFF]/10 transition-all duration-500"
+            style={{ width: `${percentage}%` }}
+          />
+          <span className="relative z-10 flex w-full items-center justify-between gap-3">
+            <span className="flex items-center gap-2">
+              {votedByMe && <span className="text-[#64CFFF]">✓</span>}
+              {option.text}
+            </span>
+            {totalVotes > 0 && (
+              <span className="text-[10px] font-bold text-white/50">
+                {percentage}%
+                <span className="ml-1 text-white/30">({voteCount})</span>
+              </span>
+            )}
+          </span>
+        </button>
+      );
+    })}
+    {(activePoll.totalVotes ?? 0) > 0 && (
+      <p className="pt-1 text-[10px] text-white/30">
+        {activePoll.totalVotes} vote{activePoll.totalVotes !== 1 ? "s" : ""}
+      </p>
+    )}
+    {activePoll.options.some((o) => o.votedByMe) && (
+      <p className="pt-1 text-[10px] text-white/40">
+        Click your selected option again to remove your vote, or pick another to change it.
+      </p>
+    )}
+  </div>
+)}
 
                     {/* Like / comment row */}
                     <div className="mt-4 flex items-center justify-between">
