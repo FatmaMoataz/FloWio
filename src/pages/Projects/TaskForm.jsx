@@ -31,26 +31,35 @@ const priorityOptions = [
 
 export default function TaskForm() {
   const navigate = useNavigate();
-  const { projectId } = useParams();
+  const { projectId, taskId } = useParams();
   const [searchParams] = useSearchParams();
 
   const project = getProject(projectId);
   const projectName = project?.name || "Project";
   const defaultStatus = searchParams.get("status") || "todo";
+  const isEditMode = Boolean(taskId);
+
+  const storageKey = `flowio-tasks-${projectId}`;
+  const oldTasks = JSON.parse(localStorage.getItem(storageKey) || "[]");
+
+  const projectTasks = project?.assignedTasks || [];
+  const taskToEdit =
+    oldTasks.find((task) => String(task.id) === String(taskId)) ||
+    projectTasks.find((task) => String(task.id) === String(taskId));
 
   const [saved, setSaved] = useState(false);
 
   const [form, setForm] = useState({
-    title: "",
-    notes: "",
-    status: defaultStatus,
-    priority: "Medium",
-    assignee: "",
-    due: "",
-    pageName: "",
-    urlLabel: "",
-    taskLink: "",
-    fileName: "",
+    title: taskToEdit?.name || taskToEdit?.title || "",
+    notes: taskToEdit?.notes || "",
+    status: taskToEdit?.status || defaultStatus,
+    priority: taskToEdit?.priority || "Medium",
+    assignee: taskToEdit?.assignee || "",
+    due: taskToEdit?.rawDue || "",
+    pageName: taskToEdit?.pageName || "",
+    urlLabel: taskToEdit?.urlLabel || "",
+    taskLink: taskToEdit?.linkUrl || "",
+    fileName: taskToEdit?.fileName || taskToEdit?.fileLabel || "",
   });
 
   const canSubmit = useMemo(() => form.title.trim().length > 0, [form.title]);
@@ -78,31 +87,49 @@ export default function TaskForm() {
     updateField("fileName", file ? file.name : "");
   };
 
+  const buildTaskPayload = () => ({
+    id: isEditMode ? Number(taskId) || taskId : Date.now(),
+    name: form.title.trim(),
+    notes: form.notes.trim() || "Type here...",
+    status: form.status,
+    priority: form.priority,
+    assignee: form.assignee.trim() || "Sarah",
+    due: formatDate(form.due),
+    rawDue: form.due,
+    pageName: form.pageName.trim() || "General Page",
+    fileLabel: form.fileName || "No file",
+    fileName: form.fileName,
+    urlLabel: form.urlLabel.trim() || "URL label",
+    linkUrl: safeUrl(form.taskLink),
+  });
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!canSubmit) return;
 
-    const newTask = {
-      id: Date.now(),
-      name: form.title.trim(),
-      notes: form.notes.trim() || "Type here...",
-      status: form.status,
-      priority: form.priority,
-      assignee: form.assignee.trim() || "Sarah",
-      due: formatDate(form.due),
-      rawDue: form.due,
-      pageName: form.pageName.trim() || "General Page",
-      fileLabel: form.fileName || "No file",
-      fileName: form.fileName,
-      urlLabel: form.urlLabel.trim() || "URL label",
-      linkUrl: safeUrl(form.taskLink),
-    };
+    const newTaskData = buildTaskPayload();
 
-    const storageKey = `flowio-tasks-${projectId}`;
-    const oldTasks = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    let updatedTasks;
 
-    localStorage.setItem(storageKey, JSON.stringify([newTask, ...oldTasks]));
+    if (isEditMode) {
+      const existsInStorage = oldTasks.some(
+        (task) => String(task.id) === String(taskId)
+      );
 
+      if (existsInStorage) {
+        updatedTasks = oldTasks.map((task) =>
+          String(task.id) === String(taskId)
+            ? { ...task, ...newTaskData }
+            : task
+        );
+      } else {
+        updatedTasks = [newTaskData, ...oldTasks];
+      }
+    } else {
+      updatedTasks = [newTaskData, ...oldTasks];
+    }
+
+    localStorage.setItem(storageKey, JSON.stringify(updatedTasks));
     setSaved(true);
 
     setTimeout(() => {
@@ -126,7 +153,7 @@ export default function TaskForm() {
           <span className="text-white/30">›</span>
 
           <h1 className="text-[25px] font-extrabold tracking-[-.4px]">
-            Add Task
+            {isEditMode ? "Edit Task" : "Add Task"}
           </h1>
         </div>
 
@@ -145,8 +172,8 @@ export default function TaskForm() {
                   Task Information
                 </h2>
                 <p className="mt-1 text-xs text-white/45">
-                  Add task details, attachment, link, status and due date for{" "}
-                  {projectName}.
+                  {isEditMode ? "Edit" : "Add"} task details, attachment, link,
+                  status and due date for {projectName}.
                 </p>
               </div>
             </div>
@@ -249,7 +276,10 @@ export default function TaskForm() {
             {saved && (
               <div className="mt-6 flex items-center gap-3 rounded-[18px] border border-emerald-300/10 bg-emerald-400/10 px-4 py-3 text-xs font-bold text-emerald-300">
                 <FaCheck />
-                Task created successfully. Redirecting to Kanban Board...
+                {isEditMode
+                  ? "Task updated successfully."
+                  : "Task created successfully."}{" "}
+                Redirecting to Kanban Board...
               </div>
             )}
 
@@ -268,7 +298,7 @@ export default function TaskForm() {
                 className="flex h-12 flex-1 items-center justify-center gap-3 rounded-[16px] bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-sm font-bold text-white shadow-[0_0_22px_rgba(95,150,255,.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <FaPaperPlane />
-                Create Task
+                {isEditMode ? "Update Task" : "Create Task"}
               </button>
             </div>
           </form>

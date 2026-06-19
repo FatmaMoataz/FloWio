@@ -21,6 +21,7 @@ import Schedule from "../pages/Schedule/Schedule";
 import ToDo from "../pages/To-Do/To-Do";
 import CompanyOnboarding from "../pages/Onboarding/CompanyOnboarding";
 import TaskForm from "../pages/Projects/TaskForm";
+<Route path="/projects/:projectId/tasks/:taskId/edit" element={<TaskForm />} />
 
 export default function AppRouter(){
   return (
@@ -50,6 +51,8 @@ export default function AppRouter(){
         <Route path="/to-do" element={<ToDo />} />
         <Route path="/company-onboarding" element={<CompanyOnboarding />} />
         <Route path="/projects/:projectId/tasks/new" element={<TaskForm />} />
+        <Route path="/projects/:projectId/tasks/:taskId/edit" element={<TaskForm />} />
+
       </Routes>
     </BrowserRouter>
   )

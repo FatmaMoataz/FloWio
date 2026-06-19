@@ -32,24 +32,28 @@ const fallbackTasks = [
     status: "in-progress",
     notes: "Connect backend API with frontend services.",
     due: "Oct 15",
+    rawDue: "2026-10-15",
     assignee: "Sarah",
     priority: "Medium",
-    fileLabel: "General Page",
-    urlLabel: "URL label",
-    linkUrl: "",
-    pageName: "General Page",
+    fileLabel: "API File",
+    fileName: "api-requirements.pdf",
+    urlLabel: "API Docs",
+    linkUrl: "https://developer.mozilla.org/",
+    pageName: "API Integration Page",
   },
   {
     id: 2,
     name: "Form validation",
     status: "in-progress",
     notes: "Add validation to all required fields.",
-    due: "Tomorrow",
+    due: "Jun 20",
+    rawDue: "2026-06-20",
     assignee: "Sarah",
     priority: "High",
-    fileLabel: "General Page",
-    urlLabel: "URL label",
-    linkUrl: "",
+    fileLabel: "Validation File",
+    fileName: "validation-notes.pdf",
+    urlLabel: "Validation Guide",
+    linkUrl: "https://react.dev/",
     pageName: "Project Form",
   },
   {
@@ -58,11 +62,13 @@ const fallbackTasks = [
     status: "completed",
     notes: "Polish UI cards and connect navigation.",
     due: "Sep 15",
+    rawDue: "2026-09-15",
     assignee: "Sarah",
     priority: "Low",
-    fileLabel: "General Page",
-    urlLabel: "URL label",
-    linkUrl: "",
+    fileLabel: "UI File",
+    fileName: "ui-design.pdf",
+    urlLabel: "UI Reference",
+    linkUrl: "https://www.figma.com/",
     pageName: "Dashboard",
   },
 ];
@@ -88,8 +94,10 @@ export default function ProjectKanban() {
         assignee: task.assignee || "Sarah",
         status: task.status || "todo",
         due: task.due || "20 Sep",
+        rawDue: task.rawDue || "2026-09-20",
         priority: task.priority || "Medium",
         fileLabel: task.fileLabel || task.pageName || "General Page",
+        fileName: task.fileName || "",
         urlLabel: task.urlLabel || task.linkTitle || "URL label",
         linkUrl: task.linkUrl || "",
         pageName: task.pageName || "General Page",
@@ -100,6 +108,7 @@ export default function ProjectKanban() {
   const [search, setSearch] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const [openStatusId, setOpenStatusId] = useState(null);
+  const [deleteTaskId, setDeleteTaskId] = useState(null);
 
   const boardTitle = project?.name || "Website Redesign";
 
@@ -127,16 +136,23 @@ export default function ProjectKanban() {
     setOpenStatusId(null);
   };
 
-  const deleteTask = (taskId) => {
+  const deleteTask = () => {
     setTasks((prev) => {
-      const updated = prev.filter((task) => task.id !== taskId);
+      const updated = prev.filter((task) => task.id !== deleteTaskId);
       updateStorage(updated);
       return updated;
     });
+
+    setDeleteTaskId(null);
     setOpenMenuId(null);
   };
 
-  const openTaskPage = (status = "todo") => {
+  const openTaskPage = (status = "todo", taskId = null) => {
+    if (taskId) {
+      navigate(`/projects/${projectId}/tasks/${taskId}/edit`);
+      return;
+    }
+
     navigate(`/projects/${projectId}/tasks/new?status=${status}`);
   };
 
@@ -154,7 +170,9 @@ export default function ProjectKanban() {
               <button
                 type="button"
                 onClick={() =>
-                  project ? navigate(`/projects/${project.id}`) : navigate("/projects")
+                  project
+                    ? navigate(`/projects/${project.id}`)
+                    : navigate("/projects")
                 }
                 className="text-white/60 transition hover:text-[#6eb5ff]"
               >
@@ -277,7 +295,7 @@ export default function ProjectKanban() {
                                 type="button"
                                 onClick={() => {
                                   setOpenMenuId(null);
-                                  openTaskPage(task.status);
+                                  openTaskPage(task.status, task.id);
                                 }}
                                 className="flex h-10 w-full items-center gap-3 rounded-[13px] px-3 text-xs font-bold text-white/75 transition hover:bg-[#24358f] hover:text-white"
                               >
@@ -297,7 +315,10 @@ export default function ProjectKanban() {
 
                               <button
                                 type="button"
-                                onClick={() => deleteTask(task.id)}
+                                onClick={() => {
+                                  setDeleteTaskId(task.id);
+                                  setOpenMenuId(null);
+                                }}
                                 className="flex h-10 w-full items-center gap-3 rounded-[13px] px-3 text-xs font-bold text-[#ff6b8a] transition hover:bg-red-400/10"
                               >
                                 <FaTrash />
@@ -400,6 +421,41 @@ export default function ProjectKanban() {
             );
           })}
         </div>
+
+        {deleteTaskId && (
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-[420px] rounded-[28px] border border-red-300/10 bg-gradient-to-br from-[#151e66] to-[#070d35] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,.65)]">
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-400/15 text-red-300">
+                <FaTrash />
+              </div>
+
+              <h3 className="text-xl font-extrabold">Delete Task?</h3>
+
+              <p className="mt-2 text-sm leading-6 text-white/50">
+                Are you sure you want to delete this task? This action cannot be
+                undone.
+              </p>
+
+              <div className="mt-7 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTaskId(null)}
+                  className="h-11 flex-1 rounded-[16px] bg-white/10 text-sm font-bold text-white/70 transition hover:bg-white/15"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={deleteTask}
+                  className="h-11 flex-1 rounded-[16px] bg-gradient-to-r from-[#ff5d73] to-[#ff7aa8] text-sm font-bold text-white shadow-[0_0_22px_rgba(255,93,115,.35)] transition hover:brightness-110"
+                >
+                  Delete Task
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </MainLayout>
   );
