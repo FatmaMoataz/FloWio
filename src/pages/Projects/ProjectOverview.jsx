@@ -16,7 +16,7 @@ import {
 } from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
 import projectService from "../../services/projectService";
-import taskService from "../../services/taskService";
+import storyService from "../../services/storyService";
 import API from "../../services/api";
 
 const priorityStyles = {
@@ -61,15 +61,16 @@ export default function ProjectOverview() {
   const { projectId } = useParams();
   
   const [project, setProject] = useState(null);
-  const [tasks, setTasks] = useState([]);
+  const [stories, setStories] = useState([]);
+  const [epics, setEpics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [message, setMessage] = useState("");
   const [assistantMessage, setAssistantMessage] = useState(
-    "Hello! I'm here to assist you.\nNeed help with your tasks?",
+    "Hello! I'm here to assist you.\nNeed help with your stories?",
   );
-  const [taskUpdating, setTaskUpdating] = useState(null);
+  const [storyUpdating, setStoryUpdating] = useState(null);
   
   const menuRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -83,7 +84,7 @@ export default function ProjectOverview() {
     return () => document.removeEventListener("mousedown", closeMenu);
   }, []);
 
-  // Fetch project and tasks
+  // Fetch project, stories, and epics
   const fetchProjectData = useCallback(async () => {
     try {
       setLoading(true);
@@ -105,13 +106,24 @@ export default function ProjectOverview() {
 
       setProject(projectData);
 
-      // Fetch tasks
+      // Fetch stories for this project
       try {
-        const tasksData = await taskService.getAllTasksByProject(projectId);
-        setTasks(Array.isArray(tasksData) ? tasksData : []);
-      } catch (taskErr) {
-        console.log("Could not load tasks:", taskErr.message);
-        setTasks([]);
+        const storiesResponse = await storyService.getStoriesByProject(projectId);
+        const storiesData = storiesResponse.data || storiesResponse || [];
+        setStories(Array.isArray(storiesData) ? storiesData : []);
+      } catch (storyErr) {
+        console.log("Could not load stories:", storyErr.message);
+        setStories([]);
+      }
+
+      // Fetch epics
+      try {
+        const epicsResponse = await API.get(`/api/epics?projectId=${projectId}`);
+        const epicsData = epicsResponse.data?.data || [];
+        setEpics(Array.isArray(epicsData) ? epicsData : []);
+      } catch (epicErr) {
+        console.log("Could not load epics:", epicErr.message);
+        setEpics([]);
       }
     } catch (err) {
       console.error("Error fetching project:", err);
@@ -127,30 +139,30 @@ export default function ProjectOverview() {
     }
   }, [projectId, fetchProjectData]);
 
-  // Calculate progress
+  // Calculate progress based on STORIES (not tasks)
   const calculateProgress = () => {
-    if (tasks.length === 0) return 0;
-    const doneTasks = tasks.filter(t => t.status === "done").length;
-    return Math.round((doneTasks / tasks.length) * 100);
+    if (stories.length === 0) return 0;
+    const doneStories = stories.filter(s => s.status === "Done").length;
+    return Math.round((doneStories / stories.length) * 100);
   };
 
-  // Toggle task status
-  const toggleTask = async (task) => {
+  // Toggle story status
+  const toggleStory = async (story) => {
     try {
-      setTaskUpdating(task._id);
+      setStoryUpdating(story._id);
       
-      const newStatus = task.status === "done" ? "in-progress" : "done";
-      const response = await taskService.updateTask(task._id, { status: newStatus });
+      const newStatus = story.status === "Done" ? "In Progress" : "Done";
+      const response = await storyService.updateStory(story._id, { status: newStatus });
       
-      if (response) {
-        setTasks(prev => prev.map(t => 
-          t._id === task._id ? { ...t, status: newStatus } : t
+      if (response.success) {
+        setStories(prev => prev.map(s => 
+          s._id === story._id ? { ...s, status: newStatus } : s
         ));
       }
     } catch (err) {
-      console.error("Error updating task:", err);
+      console.error("Error updating story:", err);
     } finally {
-      setTaskUpdating(null);
+      setStoryUpdating(null);
     }
   };
 
@@ -161,29 +173,21 @@ export default function ProjectOverview() {
     
     const userMessage = message.trim();
     
-    if (userMessage.toLowerCase().includes("priority") || userMessage.toLowerCase().includes("important")) {
+    if (userMessage.toLowerCase().includes("story") || userMessage.toLowerCase().includes("epic")) {
       setAssistantMessage(
-        `Here's how I'd prioritize your tasks:\n\n` +
-        `1. High priority tasks first (deadlines within 2 days)\n` +
-        `2. Medium priority tasks next (this week)\n` +
-        `3. Low priority tasks last (flexible timeline)\n\n` +
-        `Would you like me to help reorganize your task list?`
-      );
-    } else if (userMessage.toLowerCase().includes("deadline") || userMessage.toLowerCase().includes("schedule")) {
-      setAssistantMessage(
-        `I suggest setting realistic deadlines:\n\n` +
-        `• Break large tasks into smaller milestones\n` +
-        `• Add buffer time for unexpected delays\n` +
-        `• Review and adjust deadlines weekly\n\n` +
-        `Need help planning specific tasks?`
+        `Here's how to manage your stories:\n\n` +
+        `1. Each epic contains multiple stories\n` +
+        `2. Stories track the actual work items\n` +
+        `3. Subtasks break stories into smaller steps\n\n` +
+        `Your progress is calculated from story completion!`
       );
     } else {
       setAssistantMessage(
         `I can help you with "${userMessage}".\n\n` +
-        `Here are some suggestions:\n` +
-        `• Break it into actionable subtasks\n` +
-        `• Assign clear owners and deadlines\n` +
-        `• Track progress with regular updates`
+        `Try asking about:\n` +
+        `• Story management\n` +
+        `• Epic organization\n` +
+        `• Progress tracking`
       );
     }
     
@@ -237,7 +241,7 @@ export default function ProjectOverview() {
 
   const progress = calculateProgress();
   const color = { hex: getStatusColor(project.status), soft: "rgba(95,155,232,0.15)" };
-  const visibleTasks = showAll ? tasks : tasks.slice(0, 4);
+  const visibleStories = showAll ? stories : stories.slice(0, 4);
 
   return (
     <MainLayout>
@@ -278,11 +282,16 @@ export default function ProjectOverview() {
                   <h2 className="text-lg font-semibold">{project.name}</h2>
                   <p className="mt-1 text-xs text-white/45">{project.description || "No description"}</p>
                   
-                  {/* Progress Bar */}
+                  {/* Progress Bar - Based on Stories */}
                   <div className="mt-3 flex items-end gap-4">
                     <div className="min-w-0 flex-1">
-                      <div className="mb-2 text-right text-sm font-semibold" style={{ color: color.hex }}>
-                        {progress}%
+                      <div className="mb-2 flex justify-between items-center">
+                        <span className="text-xs text-white/40">
+                          {stories.length} stories • {epics.length} epics
+                        </span>
+                        <span className="text-sm font-semibold" style={{ color: color.hex }}>
+                          {progress}%
+                        </span>
                       </div>
                       <div className="flowio-project-progress-track h-2.5 overflow-hidden rounded-full bg-[#18275d]">
                         <div 
@@ -310,10 +319,10 @@ export default function ProjectOverview() {
                 </div>
               </div>
 
-              {/* Tasks Section */}
+              {/* Stories Section */}
               <div className="mt-7 flex items-center justify-between">
                 <h2 className="text-base font-semibold">
-                  Tasks ({tasks.length})
+                  Stories ({stories.length})
                 </h2>
                 <button 
                   type="button" 
@@ -324,20 +333,20 @@ export default function ProjectOverview() {
                 </button>
               </div>
 
-              {/* Tasks Panel */}
-              <div className="flowio-overview-task-panel mt-5 rounded-[28px] border border-white/[0.025] bg-[radial-gradient(ellipse_at_50%_45%,rgba(29,42,91,.88),rgba(14,22,64,.96))] p-5 sm:p-6">
-                {tasks.length > 0 ? (
+              {/* Stories Panel */}
+              <div className="flowio-overview-story-panel mt-5 rounded-[28px] border border-white/[0.025] bg-[radial-gradient(ellipse_at_50%_45%,rgba(29,42,91,.88),rgba(14,22,64,.96))] p-5 sm:p-6">
+                {stories.length > 0 ? (
                   <>
                     <div className="space-y-5">
-                      {visibleTasks.map((task) => {
-                        const isChecked = task.status === "done";
-                        const isUpdating = taskUpdating === task._id;
+                      {visibleStories.map((story) => {
+                        const isChecked = story.status === "Done";
+                        const isUpdating = storyUpdating === story._id;
                         
                         return (
                           <button
-                            key={task._id}
+                            key={story._id}
                             type="button"
-                            onClick={() => toggleTask(task)}
+                            onClick={() => toggleStory(story)}
                             disabled={isUpdating}
                             className="flex w-full items-center gap-2 text-left text-xs disabled:opacity-50"
                           >
@@ -349,29 +358,33 @@ export default function ProjectOverview() {
                               <FaRegSquare className="shrink-0 text-white/75" />
                             )}
                             <span className={`shrink-0 rounded-full border px-4 py-1 text-[10px] font-semibold tracking-wide capitalize ${
-                              priorityStyles[task.priority] || priorityStyles.medium
+                              priorityStyles[story.priority?.toLowerCase()] || priorityStyles.medium
                             }`}>
-                              {task.priority || "Medium"}
+                              {story.priority || "Medium"}
                             </span>
                             <span className={`min-w-0 flex-1 truncate ${isChecked ? 'text-white/40 line-through' : 'text-white/75'}`}>
-                              {task.title}
+                              {story.title}
                             </span>
                             <span className="flex shrink-0 items-center gap-2 text-[10px] text-white/55">
-                              <span className="h-2.5 w-2.5 rounded-full bg-white/70" />
-                              {formatDate(task.deadline)}
+                              <span className={`h-2.5 w-2.5 rounded-full ${
+                                story.status === "Done" ? "bg-emerald-400" :
+                                story.status === "In Progress" ? "bg-amber-400" :
+                                "bg-white/40"
+                              }`} />
+                              {story.status || "To Do"}
                             </span>
                           </button>
                         );
                       })}
                     </div>
                     <div className="mt-6 flex justify-end">
-                      {tasks.length > 4 && (
+                      {stories.length > 4 && (
                         <button
                           type="button"
                           onClick={() => setShowAll((current) => !current)}
                           className="rounded-full bg-[#5f9be8] px-7 py-2 text-[10px] font-medium text-white hover:bg-[#70a9ef] transition"
                         >
-                          {showAll ? "Show Less" : `View All (${tasks.length})`}
+                          {showAll ? "Show Less" : `View All (${stories.length})`}
                         </button>
                       )}
                     </div>
@@ -379,8 +392,8 @@ export default function ProjectOverview() {
                 ) : (
                   <div className="flex min-h-40 items-center justify-center text-center">
                     <div>
-                      <p className="text-sm text-white/40">No tasks yet</p>
-                      <p className="mt-1 text-xs text-white/25">Create tasks to get started with your project</p>
+                      <p className="text-sm text-white/40">No stories yet</p>
+                      <p className="mt-1 text-xs text-white/25">Stories track your project's work items</p>
                     </div>
                   </div>
                 )}
@@ -430,23 +443,23 @@ export default function ProjectOverview() {
             <button 
               type="button" 
               onClick={() => setAssistantMessage(
-                "Here are some task suggestions:\n\n" +
-                "1. Group related tasks together\n" +
-                "2. Set clear priorities (High/Medium/Low)\n" +
-                "3. Assign realistic deadlines\n" +
-                "4. Update status regularly\n\n" +
-                "Need help with specific tasks?"
+                "Story Management Tips:\n\n" +
+                "1. Group stories under epics\n" +
+                "2. Break stories into subtasks\n" +
+                "3. Track progress with statuses\n" +
+                "4. Update story status regularly\n\n" +
+                `Current progress: ${progress}% complete`
               )} 
               className="flowio-ai-action mt-7 flex items-center gap-3 rounded-[17px] border border-white/[0.04] bg-[#15204d] px-4 py-3 text-left text-xs font-medium hover:bg-[#1a2557] transition"
             >
-              <FaPlus /> Suggest Task Methods
+              <FaPlus /> Story Tips
             </button>
             
             <form onSubmit={sendMessage} className="flowio-ai-input mt-auto flex items-center rounded-[17px] border border-white/[0.05] bg-[#0b123f] px-4 py-3">
               <input 
                 value={message} 
                 onChange={(event) => setMessage(event.target.value)} 
-                placeholder="Ask anything..." 
+                placeholder="Ask about stories..." 
                 className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/25" 
               />
               <button type="submit" className="text-[#5f9be8] hover:text-[#70a9ef] transition">
