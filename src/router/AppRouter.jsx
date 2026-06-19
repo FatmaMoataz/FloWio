@@ -21,7 +21,8 @@ import Schedule from "../pages/Schedule/Schedule";
 import ToDo from "../pages/To-Do/To-Do";
 import CompanyOnboarding from "../pages/Onboarding/CompanyOnboarding";
 import TaskForm from "../pages/Projects/TaskForm";
-<Route path="/projects/:projectId/tasks/:taskId/edit" element={<TaskForm />} />
+import ForgotPassword from "../pages/Auth/ForgotPassword";
+
 
 export default function AppRouter(){
   return (
@@ -52,6 +53,7 @@ export default function AppRouter(){
         <Route path="/company-onboarding" element={<CompanyOnboarding />} />
         <Route path="/projects/:projectId/tasks/new" element={<TaskForm />} />
         <Route path="/projects/:projectId/tasks/:taskId/edit" element={<TaskForm />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
       </Routes>
     </BrowserRouter>
