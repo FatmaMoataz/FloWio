@@ -216,13 +216,13 @@ export default function Login() {
               <span className="text-sm text-white/70">Remember me</span>
             </label>
 
-            <button
-              type="button"
-              onClick={() => toast.info("Forgot password is coming soon.")}
-              className="text-white/55 transition hover:text-[#64CFFF]"
-            >
-              Forgot password?
-            </button>
+           <button
+  type="button"
+  onClick={() => navigate("/forgot-password")}
+  className="text-white/55 transition hover:text-[#64CFFF]"
+>
+  Forgot password?
+</button>
           </div>
 
           <button
