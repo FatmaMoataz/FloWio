@@ -16,7 +16,7 @@ import {
   FaCheck,
 } from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
-import { getProject } from "./projectStore";
+import projectService from "../../services/projectService";
 
 const COLUMNS = [
   { id: "todo", title: "TO-DO" },
