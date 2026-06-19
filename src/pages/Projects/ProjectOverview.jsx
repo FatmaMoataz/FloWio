@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -11,19 +11,36 @@ import {
   FaPaperPlane,
   FaPlus,
   FaRegSquare,
+  FaSpinner,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
-import {
-  getProject,
-  getProjectColor,
-  updateProjectTaskStatus,
-} from "./projectStore";
+import projectService from "../../services/projectService";
+import taskService from "../../services/taskService";
+import API from "../../services/api";
 
 const priorityStyles = {
-  Low: "flowio-priority-low border-sky-300/30 bg-sky-400/15 text-sky-200",
-  Medium:
-    "flowio-priority-medium border-amber-300/30 bg-amber-400/15 text-amber-200",
-  High: "flowio-priority-high border-rose-300/30 bg-rose-400/15 text-rose-200",
+  low: "border-sky-300/30 bg-sky-400/15 text-sky-200",
+  medium: "border-amber-300/30 bg-amber-400/15 text-amber-200",
+  high: "border-rose-300/30 bg-rose-400/15 text-rose-200",
+};
+
+const formatDate = (date) => {
+  if (!date) return "No date";
+  try {
+    return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(date));
+  } catch {
+    return "Invalid date";
+  }
+};
+
+const getStatusColor = (status) => {
+  const colors = {
+    active: "#5f9be8",
+    completed: "#20c997",
+    archived: "#868e96",
+  };
+  return colors[status] || "#5f9be8";
 };
 
 function AssistantAvatar({ compact = false }) {
@@ -42,15 +59,22 @@ function AssistantAvatar({ compact = false }) {
 export default function ProjectOverview() {
   const navigate = useNavigate();
   const { projectId } = useParams();
-  const [project, setProject] = useState(() => getProject(projectId));
-  const menuRef = useRef(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  
+  const [project, setProject] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [message, setMessage] = useState("");
   const [assistantMessage, setAssistantMessage] = useState(
     "Hello! I'm here to assist you.\nNeed help with your tasks?",
   );
+  const [taskUpdating, setTaskUpdating] = useState(null);
+  
+  const menuRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
+  // Close menu on outside click
   useEffect(() => {
     const closeMenu = (event) => {
       if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
@@ -59,124 +83,335 @@ export default function ProjectOverview() {
     return () => document.removeEventListener("mousedown", closeMenu);
   }, []);
 
-  if (!project) {
-    return <MainLayout><div className="flex h-full items-center justify-center text-white/60">Project not found.</div></MainLayout>;
-  }
+  // Fetch project and tasks
+  const fetchProjectData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const color = getProjectColor(project);
-  const tasks = project.assignedTasks || [];
-  const visibleTasks = showAll ? tasks : tasks.slice(0, 4);
-  const toggleTask = (task) => {
-    const status =
-      task.status === "completed" ? "in-progress" : "completed";
-    const updatedProject = updateProjectTaskStatus(project.id, task.id, status);
-    if (updatedProject) setProject(updatedProject);
+      // Fetch project
+      const projectResponse = await projectService.getProjectById(projectId);
+      let projectData = null;
+
+      if (projectResponse.success && projectResponse.data) {
+        projectData = projectResponse.data;
+      } else if (projectResponse.data) {
+        projectData = projectResponse.data;
+      }
+
+      if (!projectData) {
+        throw new Error("Project not found");
+      }
+
+      setProject(projectData);
+
+      // Fetch tasks
+      try {
+        const tasksData = await taskService.getAllTasksByProject(projectId);
+        setTasks(Array.isArray(tasksData) ? tasksData : []);
+      } catch (taskErr) {
+        console.log("Could not load tasks:", taskErr.message);
+        setTasks([]);
+      }
+    } catch (err) {
+      console.error("Error fetching project:", err);
+      setError(err.message || "Failed to load project");
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) {
+      fetchProjectData();
+    }
+  }, [projectId, fetchProjectData]);
+
+  // Calculate progress
+  const calculateProgress = () => {
+    if (tasks.length === 0) return 0;
+    const doneTasks = tasks.filter(t => t.status === "done").length;
+    return Math.round((doneTasks / tasks.length) * 100);
   };
+
+  // Toggle task status
+  const toggleTask = async (task) => {
+    try {
+      setTaskUpdating(task._id);
+      
+      const newStatus = task.status === "done" ? "in-progress" : "done";
+      const response = await taskService.updateTask(task._id, { status: newStatus });
+      
+      if (response) {
+        setTasks(prev => prev.map(t => 
+          t._id === task._id ? { ...t, status: newStatus } : t
+        ));
+      }
+    } catch (err) {
+      console.error("Error updating task:", err);
+    } finally {
+      setTaskUpdating(null);
+    }
+  };
+
+  // Send AI message
   const sendMessage = (event) => {
     event.preventDefault();
     if (!message.trim()) return;
-    setAssistantMessage(`I can help you plan "${message.trim()}". Let's break it into clear next steps.`);
+    
+    const userMessage = message.trim();
+    
+    if (userMessage.toLowerCase().includes("priority") || userMessage.toLowerCase().includes("important")) {
+      setAssistantMessage(
+        `Here's how I'd prioritize your tasks:\n\n` +
+        `1. High priority tasks first (deadlines within 2 days)\n` +
+        `2. Medium priority tasks next (this week)\n` +
+        `3. Low priority tasks last (flexible timeline)\n\n` +
+        `Would you like me to help reorganize your task list?`
+      );
+    } else if (userMessage.toLowerCase().includes("deadline") || userMessage.toLowerCase().includes("schedule")) {
+      setAssistantMessage(
+        `I suggest setting realistic deadlines:\n\n` +
+        `• Break large tasks into smaller milestones\n` +
+        `• Add buffer time for unexpected delays\n` +
+        `• Review and adjust deadlines weekly\n\n` +
+        `Need help planning specific tasks?`
+      );
+    } else {
+      setAssistantMessage(
+        `I can help you with "${userMessage}".\n\n` +
+        `Here are some suggestions:\n` +
+        `• Break it into actionable subtasks\n` +
+        `• Assign clear owners and deadlines\n` +
+        `• Track progress with regular updates`
+      );
+    }
+    
     setMessage("");
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <MainLayout>
+        <section className="flowio-projects-page mt-4 flex h-full min-h-[650px] items-center justify-center rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_42%,#090c4f_0%,#070933_58%,#05072d_100%)] p-4 sm:p-6">
+          <div className="text-center">
+            <FaSpinner className="mx-auto mb-4 text-3xl text-[#5f9be8] animate-spin" />
+            <p className="text-white/60">Loading project...</p>
+          </div>
+        </section>
+      </MainLayout>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <MainLayout>
+        <section className="flowio-projects-page mt-4 flex h-full min-h-[650px] items-center justify-center rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_42%,#090c4f_0%,#070933_58%,#05072d_100%)] p-4 sm:p-6">
+          <div className="max-w-md text-center">
+            <FaExclamationTriangle className="mx-auto mb-4 text-3xl text-rose-400" />
+            <h3 className="text-lg font-semibold text-white/80">Failed to Load Project</h3>
+            <p className="mt-2 text-sm text-white/50">{error}</p>
+            <button
+              onClick={fetchProjectData}
+              className="mt-4 rounded-xl bg-[#5f9be8] px-6 py-2.5 text-sm font-medium transition hover:bg-[#70a9ef]"
+            >
+              Try Again
+            </button>
+          </div>
+        </section>
+      </MainLayout>
+    );
+  }
+
+  if (!project) {
+    return (
+      <MainLayout>
+        <div className="flex h-full items-center justify-center text-white/60">
+          Project not found.
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const progress = calculateProgress();
+  const color = { hex: getStatusColor(project.status), soft: "rgba(95,155,232,0.15)" };
+  const visibleTasks = showAll ? tasks : tasks.slice(0, 4);
 
   return (
     <MainLayout>
       <section className="flowio-projects-page flowio-project-overview h-full min-h-[650px] overflow-y-auto rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_42%,#090c4f_0%,#070933_58%,#05072d_100%)] p-4 text-white sm:p-6 lg:min-h-0">
         <div className="mx-auto grid max-w-6xl gap-7 lg:h-full lg:grid-cols-[minmax(0,1fr)_310px]">
+          {/* Main Content */}
           <div className="min-w-0">
             <header className="flex items-center gap-3 text-sm">
-              <button type="button" onClick={() => navigate("/projects")} className="rounded-lg p-2 text-white/80 hover:bg-white/10" aria-label="Back to projects">
+              <button 
+                type="button" 
+                onClick={() => navigate("/projects")} 
+                className="rounded-lg p-2 text-white/80 hover:bg-white/10 transition" 
+                aria-label="Back to projects"
+              >
                 <FaArrowLeft />
               </button>
-              <button type="button" onClick={() => navigate("/projects")} className="text-white/45 hover:text-white/75">Projects</button>
+              <button 
+                type="button" 
+                onClick={() => navigate("/projects")} 
+                className="text-white/45 hover:text-white/75"
+              >
+                Projects
+              </button>
               <FaChevronRight className="text-[10px] text-white/45" />
               <h1 className="truncate text-lg font-semibold">{project.name}</h1>
             </header>
 
             <div className="mt-8 pl-2 sm:pl-10">
+              {/* Project Info Card */}
               <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" style={{ color: color.hex, background: color.soft, borderColor: `${color.hex}45` }}>
+                <div 
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border" 
+                  style={{ color: color.hex, background: color.soft, borderColor: `${color.hex}45` }}
+                >
                   <FaFolderOpen />
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-semibold">{project.name}</h2>
-                  <p className="mt-1 text-xs text-white/45">{project.description}</p>
+                  <p className="mt-1 text-xs text-white/45">{project.description || "No description"}</p>
+                  
+                  {/* Progress Bar */}
                   <div className="mt-3 flex items-end gap-4">
                     <div className="min-w-0 flex-1">
-                      <div className="mb-2 text-right text-sm font-semibold" style={{ color: color.hex }}>{project.progress}%</div>
+                      <div className="mb-2 text-right text-sm font-semibold" style={{ color: color.hex }}>
+                        {progress}%
+                      </div>
                       <div className="flowio-project-progress-track h-2.5 overflow-hidden rounded-full bg-[#18275d]">
-                        <div className="h-full rounded-full" style={{ width: `${project.progress}%`, background: color.hex }} />
+                        <div 
+                          className="h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${progress}%`, background: color.hex }} 
+                        />
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Date and Actions */}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <span className="flex items-center gap-2 text-[11px] text-white/40">
-                      <FaCalendarAlt /> {new Date(`${project.dueDate}T00:00:00`).toLocaleDateString("en", { month: "short", day: "numeric" })}
+                      <FaCalendarAlt /> 
+                      {project.endDate ? formatDate(project.endDate) : "No due date"}
                     </span>
-                    <button type="button" className="rounded-full bg-[#5f9be8] px-5 py-2 text-xs font-medium text-white shadow-[0_8px_20px_rgba(76,146,235,.25)]">
-                      + Arrange Meeting
+                    <button 
+                      type="button" 
+                      onClick={() => navigate(`/projects/${projectId}/kanban`)}
+                      className="rounded-full bg-[#5f9be8] px-5 py-2 text-xs font-medium text-white shadow-[0_8px_20px_rgba(76,146,235,.25)] hover:bg-[#70a9ef] transition"
+                    >
+                      View Kanban
                     </button>
                   </div>
                 </div>
               </div>
 
+              {/* Tasks Section */}
               <div className="mt-7 flex items-center justify-between">
-                <h2 className="text-base font-semibold">Assigned Tasks</h2>
-                <button type="button" onClick={() => navigate(`/projects/${project.id}/details`)} className="text-xs text-[#79b4ff] hover:underline">
-                  Project hierarchy
+                <h2 className="text-base font-semibold">
+                  Tasks ({tasks.length})
+                </h2>
+                <button 
+                  type="button" 
+                  onClick={() => navigate(`/projects/${projectId}/details`)} 
+                  className="text-xs text-[#79b4ff] hover:underline"
+                >
+                  Project details
                 </button>
               </div>
 
+              {/* Tasks Panel */}
               <div className="flowio-overview-task-panel mt-5 rounded-[28px] border border-white/[0.025] bg-[radial-gradient(ellipse_at_50%_45%,rgba(29,42,91,.88),rgba(14,22,64,.96))] p-5 sm:p-6">
-                <div className="space-y-5">
-                  {visibleTasks.map((task) => {
-                    const isChecked = task.status === "completed";
-                    return (
-                      <button
-                        key={task.id}
-                        type="button"
-                        onClick={() => toggleTask(task)}
-                        className="flex w-full items-center gap-2 text-left text-xs"
-                      >
-                        {isChecked ? <FaCheckSquare className="shrink-0 text-[#a9c7ff]" /> : <FaRegSquare className="shrink-0 text-white/75" />}
-                        <span className={`flowio-priority-badge shrink-0 rounded-full border px-4 py-1 text-[10px] font-semibold tracking-wide ${priorityStyles[task.priority] || priorityStyles.Medium}`}>{task.priority || "Medium"} Priority</span>
-                        <span className="min-w-0 flex-1 truncate text-white/75">{task.name}</span>
-                        <span className="flex shrink-0 items-center gap-2 text-[10px] text-white/55">
-                          <span className="h-2.5 w-2.5 rounded-full bg-white/70" />
-                          {task.due}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-6 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      tasks.length > 4
-                        ? setShowAll((current) => !current)
-                        : navigate(`/projects/${project.id}/details`)
-                    }
-                    className="rounded-full bg-[#5f9be8] px-7 py-2 text-[10px] font-medium text-white"
-                  >
-                    {showAll && tasks.length > 4 ? "Show Less" : "View All"}
-                  </button>
-                </div>
+                {tasks.length > 0 ? (
+                  <>
+                    <div className="space-y-5">
+                      {visibleTasks.map((task) => {
+                        const isChecked = task.status === "done";
+                        const isUpdating = taskUpdating === task._id;
+                        
+                        return (
+                          <button
+                            key={task._id}
+                            type="button"
+                            onClick={() => toggleTask(task)}
+                            disabled={isUpdating}
+                            className="flex w-full items-center gap-2 text-left text-xs disabled:opacity-50"
+                          >
+                            {isUpdating ? (
+                              <FaSpinner className="shrink-0 animate-spin text-[#a9c7ff]" />
+                            ) : isChecked ? (
+                              <FaCheckSquare className="shrink-0 text-[#a9c7ff]" />
+                            ) : (
+                              <FaRegSquare className="shrink-0 text-white/75" />
+                            )}
+                            <span className={`shrink-0 rounded-full border px-4 py-1 text-[10px] font-semibold tracking-wide capitalize ${
+                              priorityStyles[task.priority] || priorityStyles.medium
+                            }`}>
+                              {task.priority || "Medium"}
+                            </span>
+                            <span className={`min-w-0 flex-1 truncate ${isChecked ? 'text-white/40 line-through' : 'text-white/75'}`}>
+                              {task.title}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-2 text-[10px] text-white/55">
+                              <span className="h-2.5 w-2.5 rounded-full bg-white/70" />
+                              {formatDate(task.deadline)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-6 flex justify-end">
+                      {tasks.length > 4 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAll((current) => !current)}
+                          className="rounded-full bg-[#5f9be8] px-7 py-2 text-[10px] font-medium text-white hover:bg-[#70a9ef] transition"
+                        >
+                          {showAll ? "Show Less" : `View All (${tasks.length})`}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex min-h-40 items-center justify-center text-center">
+                    <div>
+                      <p className="text-sm text-white/40">No tasks yet</p>
+                      <p className="mt-1 text-xs text-white/25">Create tasks to get started with your project</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
+          {/* AI Assistant Sidebar */}
           <aside className="flowio-mini-ai relative flex min-h-[520px] flex-col rounded-[28px] border-2 border-[#202468] bg-[radial-gradient(circle_at_50%_30%,#11165b_0%,#080d39_58%,#060a2e_100%)] p-5 shadow-[0_18px_45px_rgba(1,4,27,.22)]">
             <div className="flex items-center gap-3">
               <AssistantAvatar compact />
               <h2 className="text-sm font-semibold">AI Assistant</h2>
               <div ref={menuRef} className="relative ml-auto">
-                <button type="button" onClick={() => setMenuOpen((current) => !current)} className="rounded-lg p-2 text-white/45 hover:bg-white/10 hover:text-white" aria-label="AI assistant options">
+                <button 
+                  type="button" 
+                  onClick={() => setMenuOpen((current) => !current)} 
+                  className="rounded-lg p-2 text-white/45 hover:bg-white/10 hover:text-white transition" 
+                  aria-label="AI assistant options"
+                >
                   <FaEllipsisH />
                 </button>
                 {menuOpen && (
                   <div className="flowio-project-menu absolute right-0 top-9 z-20 w-36 rounded-xl border border-white/10 bg-[#111846] p-1.5 shadow-2xl">
-                    <button type="button" onClick={() => navigate(`/projects/${project.id}/assistant`)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/75 hover:bg-white/10">
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate(`/projects/${projectId}/assistant`);
+                      }} 
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-white/75 hover:bg-white/10 transition"
+                    >
                       <FaExpand /> Full screen
                     </button>
                   </div>
@@ -184,14 +419,39 @@ export default function ProjectOverview() {
               </div>
             </div>
 
-            <div className="mt-7 flex justify-center"><AssistantAvatar /></div>
-            <div className="flowio-ai-message mt-10 whitespace-pre-line rounded-[20px] bg-[#15204d] p-5 text-xs leading-6 text-white/70">{assistantMessage}</div>
-            <button type="button" onClick={() => setAssistantMessage("I suggest grouping related subtasks, setting one clear owner, and handling the highest-impact task first.")} className="flowio-ai-action mt-7 flex items-center gap-3 rounded-[17px] border border-white/[0.04] bg-[#15204d] px-4 py-3 text-left text-xs font-medium">
-              <FaPlus /> Suggest Tasks Methods
+            <div className="mt-7 flex justify-center">
+              <AssistantAvatar />
+            </div>
+            
+            <div className="flowio-ai-message mt-10 whitespace-pre-line rounded-[20px] bg-[#15204d] p-5 text-xs leading-6 text-white/70 max-h-48 overflow-y-auto">
+              {assistantMessage}
+            </div>
+            
+            <button 
+              type="button" 
+              onClick={() => setAssistantMessage(
+                "Here are some task suggestions:\n\n" +
+                "1. Group related tasks together\n" +
+                "2. Set clear priorities (High/Medium/Low)\n" +
+                "3. Assign realistic deadlines\n" +
+                "4. Update status regularly\n\n" +
+                "Need help with specific tasks?"
+              )} 
+              className="flowio-ai-action mt-7 flex items-center gap-3 rounded-[17px] border border-white/[0.04] bg-[#15204d] px-4 py-3 text-left text-xs font-medium hover:bg-[#1a2557] transition"
+            >
+              <FaPlus /> Suggest Task Methods
             </button>
+            
             <form onSubmit={sendMessage} className="flowio-ai-input mt-auto flex items-center rounded-[17px] border border-white/[0.05] bg-[#0b123f] px-4 py-3">
-              <input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Ask anything..." className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/25" />
-              <button type="submit" className="text-[#5f9be8]"><FaPaperPlane /></button>
+              <input 
+                value={message} 
+                onChange={(event) => setMessage(event.target.value)} 
+                placeholder="Ask anything..." 
+                className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/25" 
+              />
+              <button type="submit" className="text-[#5f9be8] hover:text-[#70a9ef] transition">
+                <FaPaperPlane />
+              </button>
             </form>
           </aside>
         </div>
