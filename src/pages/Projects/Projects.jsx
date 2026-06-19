@@ -23,7 +23,7 @@ import storyService from "../../services/storyService";
 import subtaskService, { SUBTASK_STATUS } from "../../services/subtaskService";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const FILTERS = ["All Projects", "Active", "Completed"];
+const FILTERS = ["All Projects", "Active", "Completed", "Archived"];
 const PROJECT_COLORS = [
   { hex: "#5f9be8", soft: "rgba(95,155,232,0.15)" },
   { hex: "#7c5ce7", soft: "rgba(124,92,231,0.15)" },
@@ -50,9 +50,9 @@ const getProjectColor = (project, index) => {
   if (!project) return PROJECT_COLORS[0];
   switch (project.status) {
     case "completed":
-      return PROJECT_COLORS[2];
+      return PROJECT_COLORS[2]; // Green
     case "archived":
-      return { hex: "#868e96", soft: "rgba(134,142,150,0.15)" };
+      return { hex: "#868e96", soft: "rgba(134,142,150,0.15)" }; // Gray
     case "active":
     default:
       return PROJECT_COLORS[index % PROJECT_COLORS.length];
@@ -61,7 +61,7 @@ const getProjectColor = (project, index) => {
 
 const getStatusLabel = (status) => {
   const labels = { active: "Active", completed: "Completed", archived: "Archived" };
-  return labels[status] || status;
+  return labels[status] || status || "Active";
 };
 
 // ── Subtask Row ────────────────────────────────────────────────────────────────
@@ -80,14 +80,21 @@ function SubtaskRow({ subtask, accentColor, onToggle }) {
         aria-label={isDone ? "Mark incomplete" : "Mark complete"}
       >
         {isDone ? (
-          <span className="flex h-4 w-4 items-center justify-center rounded-full" style={{ backgroundColor: accentColor }}>
+          <span
+            className="flex h-4 w-4 items-center justify-center rounded-full"
+            style={{ backgroundColor: accentColor }}
+          >
             <FaCheck className="text-[8px] text-white" />
           </span>
         ) : (
           <FaRegCircle className="h-4 w-4 text-white/30" />
         )}
       </button>
-      <span className={`text-[11px] leading-4 transition-colors ${isDone ? "text-white/30 line-through" : "text-white/60"}`}>
+      <span
+        className={`text-[11px] leading-4 transition-colors ${
+          isDone ? "text-white/30 line-through" : "text-white/60"
+        }`}
+      >
         {subtask.title}
       </span>
     </div>
@@ -106,12 +113,17 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (!storyId) return;
       try {
         setLoading(true);
         const res = await subtaskService.getSubtasksByStory(storyId);
-        if (!cancelled) setSubtasks(res.data || []);
-      } catch {
-        // silently fail
+        if (!cancelled) {
+          const data = res.data || res || [];
+          setSubtasks(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.warn("Could not load subtasks:", err.message);
+        if (!cancelled) setSubtasks([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -133,7 +145,8 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
     );
     try {
       await subtaskService.toggleSubtaskComplete(subtaskId, isCompleted);
-    } catch {
+    } catch (err) {
+      // Revert on failure
       setSubtasks((prev) =>
         prev.map((s) =>
           s._id === subtaskId
@@ -151,10 +164,17 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
 
     setAdding(true);
     try {
-      const res = await subtaskService.createSubtask({ title, storyId, companyId });
-      setSubtasks((prev) => [...prev, res.data]);
-      setNewTitle("");
-      setShowInput(false);
+      const res = await subtaskService.createSubtask({
+        title,
+        storyId,
+        companyId,
+        status: "To Do",
+      });
+      if (res.success && res.data) {
+        setSubtasks((prev) => [...prev, res.data]);
+        setNewTitle("");
+        setShowInput(false);
+      }
     } catch (err) {
       console.error("Failed to add subtask:", err);
     } finally {
@@ -168,7 +188,7 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
     return (
       <div className="flex items-center gap-2 py-2 text-[11px] text-white/30">
         <FaSpinner className="animate-spin text-[10px]" />
-        Loading subtasks…
+        Loading subtasks...
       </div>
     );
   }
@@ -177,14 +197,23 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
     <div className="mt-3" onClick={(e) => e.stopPropagation()}>
       {subtasks.length > 0 && (
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[10px] text-white/30 uppercase tracking-widest">Subtasks</span>
-          <span className="text-[10px] text-white/30">{doneCount}/{subtasks.length}</span>
+          <span className="text-[10px] text-white/30 uppercase tracking-widest">
+            Subtasks
+          </span>
+          <span className="text-[10px] text-white/30">
+            {doneCount}/{subtasks.length}
+          </span>
         </div>
       )}
 
       <div className="space-y-0.5">
         {subtasks.map((subtask) => (
-          <SubtaskRow key={subtask._id} subtask={subtask} accentColor={accentColor} onToggle={handleToggle} />
+          <SubtaskRow
+            key={subtask._id}
+            subtask={subtask}
+            accentColor={accentColor}
+            onToggle={handleToggle}
+          />
         ))}
       </div>
 
@@ -198,7 +227,7 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
               if (e.key === "Enter") handleAddSubtask(e);
               if (e.key === "Escape") { setShowInput(false); setNewTitle(""); }
             }}
-            placeholder="Subtask title…"
+            placeholder="Subtask title..."
             className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white placeholder-white/25 outline-none focus:border-white/20"
           />
           <button
@@ -302,7 +331,7 @@ function DeleteConfirmModal({ project, onCancel, onConfirm, isDeleting }) {
         <h3 className="mt-4 text-lg font-semibold">Delete Project</h3>
         <p className="mt-2 text-sm leading-6 text-white/60">
           Are you sure you want to delete{" "}
-          <span className="font-medium text-white">"{project.name}"</span>? This
+          <span className="font-medium text-white">"{project?.name}"</span>? This
           action cannot be undone.
         </p>
         <div className="mt-6 flex justify-end gap-3">
@@ -353,7 +382,8 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
           const data = res.data || res || [];
           setStories(Array.isArray(data) ? data : []);
         }
-      } catch {
+      } catch (err) {
+        console.warn("Could not load stories for project card:", err.message);
         if (!cancelled) setStories([]);
       } finally {
         if (!cancelled) setStoriesLoading(false);
@@ -363,9 +393,9 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
   }, [project._id]);
 
   // Calculate progress from STORIES
-  const progress = stories.length === 0 ? 0 : Math.round(
-    (stories.filter(s => s.status === "Done").length / stories.length) * 100
-  );
+  const progress = stories.length === 0 
+    ? (project.status === "completed" ? 100 : 0)
+    : Math.round((stories.filter(s => s.status === "Done" || s.status === "done").length / stories.length) * 100);
 
   // Get first story ID for subtasks panel
   const firstStoryId = stories[0]?._id;
@@ -387,7 +417,11 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
       <div className="flex items-start gap-4">
         <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-xl shadow-[inset_0_0_18px_rgba(255,255,255,.025)]"
-          style={{ color: color.hex, backgroundColor: color.soft, borderColor: `${color.hex}45` }}
+          style={{
+            color: color.hex,
+            backgroundColor: color.soft,
+            borderColor: `${color.hex}45`,
+          }}
         >
           <FaFolderOpen />
         </div>
@@ -407,7 +441,9 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
                 aria-label={`Open actions for ${project.name}`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setOpenMenuId((current) => current === project._id ? null : project._id);
+                  setOpenMenuId((current) =>
+                    current === project._id ? null : project._id
+                  );
                 }}
                 className="rounded-lg p-1.5 text-white/45 transition hover:bg-white/10 hover:text-white"
               >
@@ -415,7 +451,11 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
               </button>
 
               {openMenuId === project._id && (
-                <ProjectMenu project={project} onClose={() => setOpenMenuId(null)} onDelete={() => onDelete(project)} />
+                <ProjectMenu
+                  project={project}
+                  onClose={() => setOpenMenuId(null)}
+                  onDelete={() => onDelete(project)}
+                />
               )}
             </div>
           </div>
@@ -429,14 +469,19 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
       {/* Progress Bar - Based on Stories */}
       <div className="mt-5">
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[11px] text-white/40 capitalize">{getStatusLabel(project.status)}</span>
+          <span className="text-[11px] text-white/40 capitalize">
+            {getStatusLabel(project.status)}
+          </span>
           <div className="flex items-center gap-3">
             {storiesLoading ? (
               <FaSpinner className="animate-spin text-[10px] text-white/30" />
             ) : (
               <span className="text-[10px] text-white/35">{stories.length} stories</span>
             )}
-            <span className="text-[15px] font-semibold tracking-wide" style={{ color: color.hex }}>
+            <span
+              className="text-[15px] font-semibold tracking-wide"
+              style={{ color: color.hex }}
+            >
               {storiesLoading ? "--" : `${progress}%`}
             </span>
           </div>
@@ -457,7 +502,7 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
       <div className="mt-4 flex items-center justify-between border-t border-white/[0.035] pt-3.5 text-[11px] text-white/42">
         <span className="flex items-center gap-2">
           <FaCalendarAlt className="text-[10px]" />
-          {formatDate(project.startDate)}
+          {formatDate(project.endDate || project.startDate)}
         </span>
         <span className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color.hex }} />
@@ -466,7 +511,7 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
         </span>
       </div>
 
-      {/* Subtasks Toggle */}
+      {/* Subtasks Toggle — only show if there are stories */}
       {firstStoryId && (
         <div className="mt-3 border-t border-white/[0.035] pt-3">
           <button
@@ -475,11 +520,19 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
             className="flex w-full items-center justify-between text-[11px] text-white/35 transition hover:text-white/60"
           >
             <span>Subtasks</span>
-            {subtasksOpen ? <FaChevronUp className="text-[9px]" /> : <FaChevronDown className="text-[9px]" />}
+            {subtasksOpen ? (
+              <FaChevronUp className="text-[9px]" />
+            ) : (
+              <FaChevronDown className="text-[9px]" />
+            )}
           </button>
 
-          {subtasksOpen && (
-            <SubtasksPanel storyId={firstStoryId} accentColor={color.hex} companyId={companyId} />
+          {subtasksOpen && firstStoryId && (
+            <SubtasksPanel
+              storyId={firstStoryId}
+              accentColor={color.hex}
+              companyId={companyId}
+            />
           )}
         </div>
       )}
@@ -490,6 +543,7 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
 // ── Main Projects Component ────────────────────────────────────────────────────
 export default function Projects() {
   const navigate = useNavigate();
+
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -500,29 +554,43 @@ export default function Projects() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [companyId, setCompanyId] = useState(null);
 
+  // ── Data Fetching ────────────────────────────────────────────────────────────
   const fetchProjects = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+
       const user = JSON.parse(localStorage.getItem("user") || "{}");
       const storedCompanyId = localStorage.getItem("companyId") || user.companyId;
-      if (!storedCompanyId) throw new Error("No company selected.");
+
+      if (!storedCompanyId) {
+        throw new Error("No company selected. Please select a company first.");
+      }
+
       setCompanyId(storedCompanyId);
+
       const response = await projectService.getProjectsByCompany(storedCompanyId);
+
       if (response.success) {
         setProjects(response.data || []);
       } else {
-        throw new Error(response.message || "Failed to fetch projects");
+        // Some APIs return data directly
+        const data = response.data || response;
+        setProjects(Array.isArray(data) ? data : []);
       }
     } catch (err) {
-      setError(err.message || "Failed to load projects.");
+      console.error("Error fetching projects:", err);
+      setError(err.message || "Failed to load projects. Please try again.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
+  // ── Delete Handler ───────────────────────────────────────────────────────────
   const handleDeleteProject = async () => {
     if (!deleteTarget) return;
     try {
@@ -532,27 +600,38 @@ export default function Projects() {
       setDeleteTarget(null);
       setOpenMenuId(null);
     } catch (err) {
-      alert(err.message || "Failed to delete project.");
+      alert(err.message || "Failed to delete project. Please try again.");
     } finally {
       setIsDeleting(false);
     }
   };
 
+  // ── Filter & Search ──────────────────────────────────────────────────────────
   const visibleProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
     return projects.filter((project) => {
+      // Search filter
       const matchesSearch =
         !query ||
         project.name?.toLowerCase().includes(query) ||
         project.description?.toLowerCase().includes(query);
-      const matchesFilter =
-        filter === "All Projects" ||
-        (filter === "Active" && project.status === "active") ||
-        (filter === "Completed" && project.status === "completed");
+
+      // Status filter
+      let matchesFilter = true;
+      if (filter === "Active") {
+        matchesFilter = project.status === "active";
+      } else if (filter === "Completed") {
+        matchesFilter = project.status === "completed";
+      } else if (filter === "Archived") {
+        matchesFilter = project.status === "archived" || project.isArchived === true;
+      }
+      // "All Projects" shows everything
+
       return matchesSearch && matchesFilter;
     });
   }, [projects, search, filter]);
 
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <MainLayout title="Projects" searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search projects...">
@@ -566,6 +645,7 @@ export default function Projects() {
     );
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────────
   if (error && !projects.length) {
     return (
       <MainLayout title="Projects" searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search projects...">
@@ -576,8 +656,16 @@ export default function Projects() {
             </div>
             <h3 className="text-lg font-semibold text-white/80">Failed to Load Projects</h3>
             <p className="mt-2 text-sm text-white/50">{error}</p>
-            <button onClick={fetchProjects} className="mx-auto mt-6 flex items-center gap-2 rounded-xl bg-[#5f9be8] px-6 py-2.5 text-sm font-medium text-white transition hover:bg-[#70a9ef] active:scale-95">
-              <FaSync className="text-xs" /> Try Again
+            <div className="mt-4 text-xs text-white/30">
+              <p>Company ID: {companyId || "Not found"}</p>
+              <p>Token: {localStorage.getItem("token") ? "Present ✅" : "Missing ❌"}</p>
+            </div>
+            <button
+              onClick={fetchProjects}
+              className="mx-auto mt-6 flex items-center gap-2 rounded-xl bg-[#5f9be8] px-6 py-2.5 text-sm font-medium text-white transition hover:bg-[#70a9ef] active:scale-95"
+            >
+              <FaSync className="text-xs" />
+              Try Again
             </button>
           </div>
         </section>
@@ -585,9 +673,12 @@ export default function Projects() {
     );
   }
 
+  // ── Main Render ──────────────────────────────────────────────────────────────
   return (
     <MainLayout title="Projects" searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search projects...">
       <section className="flowio-projects-page mt-4 flex h-full min-h-[620px] flex-col overflow-hidden rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_44%,#090c4f_0%,#070933_42%,#061164_74%,#090c4f_100%)] p-4 text-white shadow-[inset_0_0_70px_rgba(5,8,54,.58),0_18px_50px_rgba(1,3,28,.2)] sm:p-7 lg:mt-3 lg:min-h-0">
+
+        {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-6 overflow-x-auto sm:gap-10">
             {FILTERS.map((item) => (
@@ -595,22 +686,29 @@ export default function Projects() {
                 key={item}
                 type="button"
                 onClick={() => setFilter(item)}
-                className={`relative whitespace-nowrap pb-2 text-sm font-medium transition sm:text-base ${filter === item ? "text-[#a7b8ff]" : "text-white/55 hover:text-white/80"}`}
+                className={`relative whitespace-nowrap pb-2 text-sm font-medium transition sm:text-base ${
+                  filter === item ? "text-[#a7b8ff]" : "text-white/55 hover:text-white/80"
+                }`}
               >
                 {item}
-                {filter === item && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#9fb2ff]" />}
+                {filter === item && (
+                  <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#9fb2ff]" />
+                )}
               </button>
             ))}
           </div>
+
           <button
             type="button"
             onClick={() => navigate("/projects/new")}
             className="flex items-center justify-center gap-2 rounded-full bg-[#5f9be8] px-6 py-2.5 text-sm font-medium shadow-[0_8px_22px_rgba(74,137,230,.22)] transition hover:-translate-y-0.5 hover:bg-[#70a9ef] active:scale-95"
           >
-            <FaPlus className="text-[10px]" /> New Project
+            <FaPlus className="text-[10px]" />
+            New Project
           </button>
         </div>
 
+        {/* Projects Grid */}
         <div className="mt-8 min-h-0 flex-1 overflow-y-auto pr-1 custom-scrollbar">
           {visibleProjects.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -632,20 +730,36 @@ export default function Projects() {
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
                 <FaFolderOpen className="text-2xl text-white/20" />
               </div>
-              <h3 className="text-lg font-medium text-white/70">{search ? "No matching projects" : "No projects yet"}</h3>
+              <h3 className="text-lg font-medium text-white/70">
+                {search ? "No matching projects" : "No projects yet"}
+              </h3>
               <p className="mt-1 max-w-sm text-xs text-white/40">
-                {search ? "Try adjusting your search." : "Create your first project to get started."}
+                {search
+                  ? "Try adjusting your search or filter criteria."
+                  : "Create your first project to get started with your workflow."}
               </p>
               {!search && (
-                <button onClick={() => navigate("/projects/new")} className="mt-6 flex items-center gap-2 rounded-xl bg-[#5f9be8]/20 px-5 py-2.5 text-sm font-medium text-[#82b6ff] transition hover:bg-[#5f9be8]/30">
-                  <FaPlus className="text-[10px]" /> Create Project
+                <button
+                  onClick={() => navigate("/projects/new")}
+                  className="mt-6 flex items-center gap-2 rounded-xl bg-[#5f9be8]/20 px-5 py-2.5 text-sm font-medium text-[#82b6ff] transition hover:bg-[#5f9be8]/30"
+                >
+                  <FaPlus className="text-[10px]" />
+                  Create Project
                 </button>
               )}
             </div>
           )}
         </div>
       </section>
-      {deleteTarget && <DeleteConfirmModal project={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={handleDeleteProject} isDeleting={isDeleting} />}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          project={deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleDeleteProject}
+          isDeleting={isDeleting}
+        />
+      )}
     </MainLayout>
   );
 }

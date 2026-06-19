@@ -15,7 +15,11 @@ const storyService = {
   getStoriesByProject: async (projectId) => {
     try {
       const response = await API.get(`/api/stories/project/${projectId}`);
-      return response.data;
+      // Handle both response formats
+      if (response.data.success !== undefined) {
+        return response.data;
+      }
+      return { success: true, data: response.data };
     } catch (error) {
       throw handleError(error);
     }
@@ -25,7 +29,10 @@ const storyService = {
   getStoriesByEpic: async (epicId) => {
     try {
       const response = await API.get(`/api/stories/epic/${epicId}`);
-      return response.data;
+      if (response.data.success !== undefined) {
+        return response.data;
+      }
+      return { success: true, data: response.data };
     } catch (error) {
       throw handleError(error);
     }
@@ -35,7 +42,10 @@ const storyService = {
   getStoryById: async (storyId) => {
     try {
       const response = await API.get(`/api/stories/${storyId}`);
-      return response.data;
+      if (response.data.success !== undefined) {
+        return response.data;
+      }
+      return { success: true, data: response.data };
     } catch (error) {
       throw handleError(error);
     }

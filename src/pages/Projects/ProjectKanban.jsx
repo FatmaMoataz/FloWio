@@ -4,11 +4,7 @@ import {
   FaArrowLeft,
   FaCalendarAlt,
   FaChevronDown,
-  FaEdit,
   FaEllipsisH,
-  FaExternalLinkAlt,
-  FaLink,
-  FaPaperclip,
   FaPlus,
   FaSearch,
   FaTrash,
@@ -23,7 +19,20 @@ import MainLayout from "../../layout/MainLayout";
 import projectService from "../../services/projectService";
 import storyService from "../../services/storyService";
 import subtaskService from "../../services/subtaskService";
-import API from "../../services/api";
+
+// Status mapping - normalized
+const STATUS_MAP = {
+  "To Do": "To Do",
+  "todo": "To Do",
+  "In Progress": "In Progress",
+  "in-progress": "In Progress",
+  "in_progress": "In Progress",
+  "Review": "Review",
+  "in-review": "Review",
+  "Done": "Done",
+  "done": "Done",
+  "completed": "Done",
+};
 
 const COLUMNS = [
   { id: "To Do", title: "TO-DO", color: "#6eb5ff" },
@@ -34,9 +43,13 @@ const COLUMNS = [
 
 const priorityStyles = {
   Low: "bg-violet-400/15 text-violet-300",
+  low: "bg-violet-400/15 text-violet-300",
   Medium: "bg-blue-400/15 text-[#78aaff]",
+  medium: "bg-blue-400/15 text-[#78aaff]",
   High: "bg-rose-400/15 text-rose-300",
+  high: "bg-rose-400/15 text-rose-300",
   Urgent: "bg-red-500/20 text-red-300",
+  urgent: "bg-red-500/20 text-red-300",
 };
 
 const formatDate = (date) => {
@@ -48,8 +61,14 @@ const formatDate = (date) => {
   }
 };
 
+// Normalize status to standard format
+const normalizeStatus = (status) => {
+  if (!status) return "To Do";
+  return STATUS_MAP[status] || STATUS_MAP[status.toLowerCase()] || "To Do";
+};
+
 // ── Subtask Item ───────────────────────────────────────────────────────────────
-function SubtaskItem({ subtask, storyId, onUpdate }) {
+function SubtaskItem({ subtask, onUpdate }) {
   const [toggling, setToggling] = useState(false);
 
   const handleToggle = async (e) => {
@@ -58,7 +77,7 @@ function SubtaskItem({ subtask, storyId, onUpdate }) {
     try {
       const newCompleted = !subtask.isCompleted;
       await subtaskService.toggleSubtaskComplete(subtask._id, newCompleted);
-      onUpdate(storyId);
+      onUpdate();
     } catch (err) {
       console.error("Failed to toggle subtask:", err);
     } finally {
@@ -100,12 +119,14 @@ function SubtaskList({ storyId, companyId }) {
   const [adding, setAdding] = useState(false);
 
   const fetchSubtasks = useCallback(async () => {
+    if (!storyId) return;
     try {
       setLoading(true);
       const res = await subtaskService.getSubtasksByStory(storyId);
-      setSubtasks(res.data || []);
+      const data = res.data || res || [];
+      setSubtasks(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Failed to load subtasks:", err);
+      console.warn("Failed to load subtasks:", err.message);
       setSubtasks([]);
     } finally {
       setLoading(false);
@@ -129,7 +150,7 @@ function SubtaskList({ storyId, companyId }) {
         companyId,
         status: "To Do",
       });
-      if (res.success) {
+      if (res.success && res.data) {
         setSubtasks((prev) => [...prev, res.data]);
         setNewTitle("");
         setShowInput(false);
@@ -145,7 +166,7 @@ function SubtaskList({ storyId, companyId }) {
     return (
       <div className="py-2 text-[10px] text-white/30">
         <FaSpinner className="inline animate-spin mr-2" />
-        Loading subtasks...
+        Loading...
       </div>
     );
   }
@@ -163,7 +184,6 @@ function SubtaskList({ storyId, companyId }) {
         <SubtaskItem
           key={subtask._id}
           subtask={subtask}
-          storyId={storyId}
           onUpdate={fetchSubtasks}
         />
       ))}
@@ -209,7 +229,11 @@ function StoryCard({ story, onStatusChange, onDelete, companyId }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const [showSubtasks, setShowSubtasks] = useState(false);
 
+  const normalizedStatus = normalizeStatus(story.status);
   const priority = story.priority || "Medium";
+  const priorityKey = Object.keys(priorityStyles).find(
+    k => k.toLowerCase() === priority.toLowerCase()
+  ) || "Medium";
 
   return (
     <article className="group relative overflow-visible rounded-[24px] border border-blue-300/10 bg-[#0b1246]/90 p-4 shadow-[0_18px_40px_rgba(0,0,0,.22)] transition hover:bg-[#10195a] hover:shadow-[0_20px_50px_rgba(110,181,255,.18)]">
@@ -250,15 +274,16 @@ function StoryCard({ story, onStatusChange, onDelete, companyId }) {
         )}
       </div>
 
-      {/* Attachments */}
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] text-white/55">
-        {story.tags?.map((tag, i) => (
-          <span key={i} className="flex items-center gap-1.5 rounded-full bg-pink-400/10 px-2 py-1 text-pink-300">
-            <FaPaperclip />
-            {tag}
-          </span>
-        ))}
-      </div>
+      {/* Tags */}
+      {story.tags && story.tags.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] text-white/55">
+          {story.tags.map((tag, i) => (
+            <span key={i} className="flex items-center gap-1.5 rounded-full bg-pink-400/10 px-2 py-1 text-pink-300">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Description */}
       {story.description && (
@@ -270,18 +295,47 @@ function StoryCard({ story, onStatusChange, onDelete, companyId }) {
 
       {/* Priority & Status */}
       <div className="mb-4 flex items-center justify-between gap-2">
-        <span className={`rounded-full px-3 py-1 text-[9px] font-bold ${priorityStyles[priority] || priorityStyles.Medium}`}>
+        <span className={`rounded-full px-3 py-1 text-[9px] font-bold ${priorityStyles[priorityKey] || priorityStyles.Medium}`}>
           {priority}
         </span>
 
-        <StatusDropdown
-          storyId={story._id}
-          value={story.status}
-          options={COLUMNS}
-          open={statusOpen}
-          setOpen={setStatusOpen}
-          onChange={(newStatus) => onStatusChange(story._id, newStatus)}
-        />
+        {/* Status Dropdown */}
+        <div className={`relative ${statusOpen ? "z-[99999]" : "z-20"}`}>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setStatusOpen(!statusOpen); }}
+            className="flex h-7 min-w-[112px] items-center justify-between gap-2 rounded-full border border-[#2c3d9f] bg-[#141d66] px-3 text-[9px] font-bold text-[#9ec9ff] transition hover:bg-[#1b277d]"
+          >
+            {COLUMNS.find(c => c.id === normalizedStatus)?.title || normalizedStatus}
+            <FaChevronDown className={`text-[8px] text-white/55 transition ${statusOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {statusOpen && (
+            <div
+              className="absolute right-0 top-9 z-[99999] w-44 overflow-hidden rounded-2xl border border-[#3148b8] bg-[#192672] p-2 shadow-[0_25px_60px_rgba(0,0,0,.85)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {COLUMNS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    onStatusChange(story._id, option.id);
+                    setStatusOpen(false);
+                  }}
+                  className={`flex h-10 w-full items-center justify-between rounded-[13px] px-3 text-[10px] font-bold transition ${
+                    normalizedStatus === option.id
+                      ? "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white"
+                      : "text-white/75 hover:bg-[#24358f] hover:text-white"
+                  }`}
+                >
+                  {option.title}
+                  {normalizedStatus === option.id && <FaCheck className="text-[9px]" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer */}
@@ -299,53 +353,9 @@ function StoryCard({ story, onStatusChange, onDelete, companyId }) {
 
       {/* Subtasks */}
       {showSubtasks && (
-        <SubtaskList storyId={story._id} companyId={story.companyId} />
+        <SubtaskList storyId={story._id} companyId={companyId} />
       )}
     </article>
-  );
-}
-
-// ── Status Dropdown ────────────────────────────────────────────────────────────
-function StatusDropdown({ storyId, value, options, open, setOpen, onChange }) {
-  const selected = options.find((option) => option.id === value);
-
-  return (
-    <div className={`relative ${open ? "z-[99999]" : "z-20"}`}>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="flex h-7 min-w-[112px] items-center justify-between gap-2 rounded-full border border-[#2c3d9f] bg-[#141d66] px-3 text-[9px] font-bold text-[#9ec9ff] transition hover:bg-[#1b277d]"
-      >
-        {selected?.title || value}
-        <FaChevronDown className={`text-[8px] text-white/55 transition ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div
-          className="absolute right-0 top-9 z-[99999] w-44 overflow-hidden rounded-2xl border border-[#3148b8] bg-[#192672] p-2 shadow-[0_25px_60px_rgba(0,0,0,.85)]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {options.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => {
-                onChange(option.id);
-                setOpen(false);
-              }}
-              className={`flex h-10 w-full items-center justify-between rounded-[13px] px-3 text-[10px] font-bold transition ${
-                value === option.id
-                  ? "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white"
-                  : "text-white/75 hover:bg-[#24358f] hover:text-white"
-              }`}
-            >
-              {option.title}
-              {value === option.id && <FaCheck className="text-[9px]" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -410,7 +420,6 @@ export default function ProjectKanban() {
       setLoading(true);
       setError(null);
 
-      // Get company ID
       const user = JSON.parse(localStorage.getItem("user") || "{}");
       const compId = localStorage.getItem("companyId") || user.companyId;
       setCompanyId(compId);
@@ -423,7 +432,14 @@ export default function ProjectKanban() {
       // Fetch stories
       const storiesRes = await storyService.getStoriesByProject(projectId);
       const storiesData = storiesRes.data || storiesRes || [];
-      setStories(Array.isArray(storiesData) ? storiesData : []);
+      const rawStories = Array.isArray(storiesData) ? storiesData : [];
+      
+      // Normalize statuses
+      const normalizedStories = rawStories.map(s => ({
+        ...s,
+        status: normalizeStatus(s.status),
+      }));
+      setStories(normalizedStories);
     } catch (err) {
       console.error("Error loading kanban:", err);
       setError(err.message || "Failed to load kanban board");
@@ -444,8 +460,7 @@ export default function ProjectKanban() {
       (story) =>
         story.title?.toLowerCase().includes(query) ||
         story.description?.toLowerCase().includes(query) ||
-        story.priority?.toLowerCase().includes(query) ||
-        story.status?.toLowerCase().includes(query)
+        story.priority?.toLowerCase().includes(query)
     );
   }, [stories, search]);
 
@@ -460,8 +475,7 @@ export default function ProjectKanban() {
       await storyService.updateStory(storyId, { status: newStatus });
     } catch (err) {
       console.error("Failed to update story status:", err);
-      // Revert on failure
-      fetchData();
+      fetchData(); // Revert on failure
     }
   };
 
@@ -533,10 +547,8 @@ export default function ProjectKanban() {
               >
                 <FaArrowLeft />
               </button>
-
               <span className="text-white/45">Projects</span>
               <span className="text-white/30">›</span>
-
               <h1 className="text-[22px] font-extrabold tracking-[-.3px]">
                 {boardTitle} Kanban Board
               </h1>
@@ -552,13 +564,11 @@ export default function ProjectKanban() {
                   className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/45"
                 />
               </div>
-
-              <div className="flex items-center gap-2 text-xs text-white/40">
-                <span>{stories.length} stories</span>
-              </div>
+              <span className="text-xs text-white/40">{stories.length} stories</span>
             </div>
           </div>
 
+          {/* Navigate to Story Form (not project form) */}
           <button
             type="button"
             onClick={() => navigate(`/projects/${projectId}/stories/new`)}
@@ -585,13 +595,8 @@ export default function ProjectKanban() {
               >
                 <div className="mb-4 flex shrink-0 items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div
-                      className="h-3 w-3 rounded-full"
-                      style={{ backgroundColor: column.color }}
-                    />
-                    <h2 className="text-[13px] font-bold text-white/80">
-                      {column.title}
-                    </h2>
+                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: column.color }} />
+                    <h2 className="text-[13px] font-bold text-white/80">{column.title}</h2>
                     <span className="flex h-7 min-w-7 items-center justify-center rounded-[10px] bg-[#0b1246] px-2 text-xs font-bold">
                       {columnStories.length}
                     </span>

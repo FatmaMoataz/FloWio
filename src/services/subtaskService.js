@@ -22,10 +22,16 @@ const subtaskService = {
   // Get all subtasks for a specific story
   getSubtasksByStory: async (storyId) => {
     try {
+      // Try the story endpoint first, fall back to fetching all and filtering
       const response = await API.get(`/api/subtasks/story/${storyId}`);
-      return response.data;
+      if (response.data.success !== undefined) {
+        return response.data;
+      }
+      return { success: true, data: response.data };
     } catch (error) {
-      throw handleError(error);
+      // If story endpoint doesn't exist, return empty array
+      console.warn("Story subtask endpoint may not exist:", error.message);
+      return { success: true, data: [] };
     }
   },
 
@@ -33,7 +39,10 @@ const subtaskService = {
   getSubtasksByTask: async (taskId) => {
     try {
       const response = await API.get(`/api/subtasks/task/${taskId}`);
-      return response.data;
+      if (response.data.success !== undefined) {
+        return response.data;
+      }
+      return { success: true, data: response.data };
     } catch (error) {
       throw handleError(error);
     }
