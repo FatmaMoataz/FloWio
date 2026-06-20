@@ -118,6 +118,15 @@ const projectService = {
       throw handleError(error);
     }
   },
+
+  updateProjectStatusFromStories: async (projectId) => {
+  try {
+    const response = await API.put(`/api/projects/${projectId}/update-status`);
+    return response.data;
+  } catch (error) {
+    throw handleError(error);
+  }
+},
 };
 
 export default projectService;

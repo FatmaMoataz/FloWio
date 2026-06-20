@@ -44,9 +44,25 @@ const formatDate = (date) => {
   }
 };
 
+const isDoneStory = (story) => {
+  const status = String(story?.status || "").toLowerCase();
+  return status === "done" || status === "completed";
+};
+
+const calculateProjectProgress = (project, stories = []) => {
+  if (!stories.length) return project.status === "completed" ? 100 : 0;
+  return Math.round((stories.filter(isDoneStory).length / stories.length) * 100);
+};
+
+const getProjectDisplayStatus = (project, progress = Number(project?.progress) || 0) => {
+  if (project?.status === "archived" || project?.isArchived) return "archived";
+  if (progress >= 100 || project?.status === "completed") return "completed";
+  return "active";
+};
+
 const getProjectColor = (project, index) => {
   if (!project) return PROJECT_COLORS[0];
-  switch (project.status) {
+  switch (getProjectDisplayStatus(project)) {
     case "completed":
       return PROJECT_COLORS[2];
     case "archived":
@@ -276,10 +292,10 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
     return () => { cancelled = true; };
   }, [project._id]);
 
-  const doneStories = stories.filter(s => s.status === "Done" || s.status === "done").length;
   const progress = stories.length === 0
-    ? (project.status === "completed" ? 100 : 0)
-    : Math.round((doneStories / stories.length) * 100);
+    ? Number(project.progress) || calculateProjectProgress(project)
+    : calculateProjectProgress(project, stories);
+  const displayStatus = getProjectDisplayStatus(project, progress);
 
   const firstStoryId = stories[0]?._id;
 
@@ -312,7 +328,7 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
 
       <div className="mt-5">
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[11px] text-white/40 capitalize">{getStatusLabel(project.status)}</span>
+          <span className="text-[11px] text-white/40 capitalize">{getStatusLabel(displayStatus)}</span>
           <div className="flex items-center gap-3">
             {storiesLoading ? <FaSpinner className="animate-spin text-[10px] text-white/30" /> : <span className="text-[10px] text-white/35">{stories.length} stories</span>}
             <span className="text-[15px] font-semibold tracking-wide" style={{ color: color.hex }}>{storiesLoading ? "--" : `${progress}%`}</span>
@@ -362,11 +378,38 @@ export default function Projects() {
       if (!storedCompanyId) throw new Error("No company selected.");
       setCompanyId(storedCompanyId);
       const response = await projectService.getProjectsByCompany(storedCompanyId);
+      const rawProjects = response?.success
+        ? response.data || []
+        : (() => {
+            const data = response?.data || response;
+            return Array.isArray(data) ? data : [];
+          })();
+
+      const projectsWithProgress = await Promise.all(
+        rawProjects.map(async (project) => {
+          try {
+            const storiesRes = await storyService.getStoriesByProject(project._id || project.id);
+            const stories = storiesRes?.data || storiesRes || [];
+            return {
+              ...project,
+              progress: calculateProjectProgress(project, Array.isArray(stories) ? stories : []),
+            };
+          } catch (err) {
+            console.error(`Failed to load stories for project ${project._id || project.id}:`, err);
+            return {
+              ...project,
+              progress: Number.isFinite(Number(project.progress))
+                ? Number(project.progress)
+                : calculateProjectProgress(project),
+            };
+          }
+        })
+      );
+
       if (response?.success) {
-        setProjects(response.data || []);
+        setProjects(projectsWithProgress);
       } else {
-        const data = response?.data || response;
-        setProjects(Array.isArray(data) ? data : []);
+        setProjects(projectsWithProgress);
       }
     } catch (err) {
       setError(err.message || "Failed to load projects.");
@@ -397,9 +440,10 @@ export default function Projects() {
     return projects.filter((project) => {
       const matchesSearch = !query || project.name?.toLowerCase().includes(query) || project.description?.toLowerCase().includes(query);
       let matchesFilter = true;
-      if (filter === "Active") matchesFilter = project.status === "active";
-      else if (filter === "Completed") matchesFilter = project.status === "completed";
-      else if (filter === "Archived") matchesFilter = project.status === "archived" || project.isArchived === true;
+      const displayStatus = getProjectDisplayStatus(project);
+      if (filter === "Active") matchesFilter = displayStatus === "active";
+      else if (filter === "Completed") matchesFilter = displayStatus === "completed";
+      else if (filter === "Archived") matchesFilter = displayStatus === "archived";
       return matchesSearch && matchesFilter;
     });
   }, [projects, search, filter]);

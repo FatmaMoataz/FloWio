@@ -4,6 +4,7 @@
   import { jwtDecode } from "jwt-decode";
   import API, { handleError } from "../../services/api";
   import meetingService from "../../services/meetingService";
+  import storyService from "../../services/storyService";
   import { toast, ToastContainer } from "react-toastify";
 
   import {
@@ -42,6 +43,16 @@
     if (t.includes("ai") || t.includes("bot")) return <FaRobot />;
     if (t.includes("code") || t.includes("app") || t.includes("dev")) return <FaLaptopCode />;
     return <FaProjectDiagram />;
+  };
+
+  const isDoneStory = (story) => {
+    const status = String(story?.status || "").toLowerCase();
+    return status === "done" || status === "completed";
+  };
+
+  const calculateProjectProgress = (project, stories = []) => {
+    if (!stories.length) return project.status === "completed" ? 100 : 0;
+    return Math.round((stories.filter(isDoneStory).length / stories.length) * 100);
   };
 
   export default function Teams() {
@@ -126,11 +137,32 @@
                 projects = [];
               }
 
+              const projectsWithProgress = await Promise.all(
+                projects.map(async (project) => {
+                  try {
+                    const storiesRes = await storyService.getStoriesByProject(project._id);
+                    const stories = storiesRes?.data || storiesRes || [];
+                    return {
+                      ...project,
+                      progress: calculateProjectProgress(project, Array.isArray(stories) ? stories : []),
+                    };
+                  } catch (err) {
+                    console.error(`Error fetching stories for project ${project._id}:`, err);
+                    return {
+                      ...project,
+                      progress: Number.isFinite(Number(project.progress))
+                        ? Number(project.progress)
+                        : calculateProjectProgress(project),
+                    };
+                  }
+                })
+              );
+
               return {
                 ...team,
                 archived: team.archived || false,
                 members,
-                projects,
+                projects: projectsWithProgress,
               };
             })
           );

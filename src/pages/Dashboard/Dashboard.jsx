@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import notificationService from "../../services/notificationService";
 import API from "../../services/api";
+import storyService from "../../services/storyService";
 
 import {
   FaProjectDiagram,
@@ -47,6 +48,24 @@ const statusToProgress = (s) => {
   if (STATUS.isDone(s)) return 100;
   if (STATUS.isInProgress(s)) return 50;
   return 0;
+};
+
+const isDoneStory = (story) => {
+  const status = String(story?.status || "").toLowerCase();
+  return status === "done" || status === "completed";
+};
+
+const calculateProjectProgress = (project, stories = []) => {
+  if (!stories.length) return project.status === "completed" ? 100 : 0;
+  return Math.round((stories.filter(isDoneStory).length / stories.length) * 100);
+};
+
+const getProjectDisplayStatus = (project) => {
+  const progress = Number(project?.progress) || 0;
+  if (project?.status === "archived" || project?.isArchived) return "archived";
+  if (progress >= 100 || project?.status === "completed") return "completed";
+  if (progress > 0 || STATUS.isInProgress(project?.status)) return "in-progress";
+  return "todo";
 };
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
@@ -309,7 +328,44 @@ export default function Dashboard() {
             if (r.ok) {
               const d = await r.json();
               fetchedProjects = d.data || (Array.isArray(d) ? d : d.projects || []);
-              const active = fetchedProjects.filter((p) => (p.progress !== undefined ? p.progress < 100 : true)).length;
+
+              fetchedProjects = await Promise.all(
+                fetchedProjects.map(async (project) => {
+                  try {
+                    const storiesRes = await storyService.getStoriesByProject(project._id || project.id);
+                    const stories = storiesRes?.data || storiesRes || [];
+                    return {
+                      ...project,
+                      progress: calculateProjectProgress(project, Array.isArray(stories) ? stories : []),
+                    };
+                  } catch (err) {
+                    console.error(`Stories fetch error for dashboard project ${project._id || project.id}:`, err);
+                    return {
+                      ...project,
+                      progress: Number.isFinite(Number(project.progress))
+                        ? Number(project.progress)
+                        : calculateProjectProgress(project),
+                    };
+                  }
+                })
+              );
+
+              const active = fetchedProjects.filter((p) => getProjectDisplayStatus(p) === "in-progress" || getProjectDisplayStatus(p) === "todo").length;
+              const chartProjects = fetchedProjects.filter((p) => getProjectDisplayStatus(p) !== "archived");
+              const totalChartProjects = chartProjects.length;
+              if (totalChartProjects > 0) {
+                const done = chartProjects.filter((p) => getProjectDisplayStatus(p) === "completed").length;
+                const inProgress = chartProjects.filter((p) => getProjectDisplayStatus(p) === "in-progress").length;
+                const todo = totalChartProjects - done - inProgress;
+                setProjectProgressStats({
+                  donePercent: Math.round((done / totalChartProjects) * 100),
+                  inProgressPercent: Math.round((inProgress / totalChartProjects) * 100),
+                  toDoPercent: Math.round((todo / totalChartProjects) * 100),
+                });
+              } else {
+                setProjectProgressStats({ donePercent: 0, inProgressPercent: 0, toDoPercent: 0 });
+              }
+
               setProjectStats({ total: fetchedProjects.length, active });
             }
           } catch (e) { console.error("Projects fetch error:", e); }
@@ -392,18 +448,6 @@ export default function Dashboard() {
           const total   = allTasks.length;
           const pending = allTasks.filter((t) => !STATUS.isDone(t.status)).length;
           setTaskStats({ total, pending });
-
-          // Donut chart data
-          if (total > 0) {
-            const done       = allTasks.filter((t) => STATUS.isDone(t.status)).length;
-            const inProgress = allTasks.filter((t) => STATUS.isInProgress(t.status)).length;
-            const todo       = total - done - inProgress;
-            setProjectProgressStats({
-              donePercent:       Math.round((done       / total) * 100),
-              inProgressPercent: Math.round((inProgress / total) * 100),
-              toDoPercent:       Math.round((todo       / total) * 100),
-            });
-          }
 
           // Bar chart (first 4 tasks)
           const chart = allTasks.slice(0, 4).map((t) => {
