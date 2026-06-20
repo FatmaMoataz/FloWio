@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   FaBriefcase,
-  FaClipboardList,
+  FaThLarge,
   FaUser,
   FaTasks,
   FaUsers,
@@ -14,12 +14,12 @@ import logo from "../../assets/logo.svg";
 const links = [
   {
     to: "/dashboard",
-    icon: <FaBriefcase />,
+    icon: <FaThLarge />,
     label: "Dashboard",
   },
   {
     to: "/projects",
-    icon: <FaClipboardList />,
+    icon: <FaBriefcase />,
     label: "Projects",
   },
   {

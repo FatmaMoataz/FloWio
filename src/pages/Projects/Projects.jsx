@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  FaArchive,
   FaCalendarAlt,
   FaColumns,
   FaEllipsisH,
@@ -222,9 +223,10 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
   );
 }
 
-function ProjectMenu({ project, onClose, onDelete }) {
+function ProjectMenu({ project, onClose, onArchive, onDelete }) {
   const navigate = useNavigate();
   const menuRef = useRef(null);
+  const isArchived = getProjectDisplayStatus(project) === "archived";
 
   useEffect(() => {
     const closeOnOutsideClick = (event) => {
@@ -239,6 +241,9 @@ function ProjectMenu({ project, onClose, onDelete }) {
       {[
         { label: "View kanban", icon: FaColumns, onClick: () => { onClose(); navigate(`/projects/${project._id}/kanban`); } },
         { label: "View details", icon: FaEye, onClick: () => { onClose(); navigate(`/projects/${project._id}`); } },
+        ...(!isArchived
+          ? [{ label: "Archive", icon: FaArchive, onClick: () => { onClose(); onArchive(); } }]
+          : []),
         { label: "Delete", icon: FaTrashAlt, danger: true, onClick: () => { onClose(); onDelete(); } },
       ].map(({ label, icon: Icon, danger, onClick }) => (
         <button key={label} type="button" onClick={onClick} className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium transition ${danger ? "text-rose-300 hover:bg-rose-500/20 hover:text-rose-200" : "text-white/75 hover:bg-white/10 hover:text-white"}`}>
@@ -267,7 +272,7 @@ function DeleteConfirmModal({ project, onCancel, onConfirm, isDeleting }) {
   );
 }
 
-function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onDelete, onClick }) {
+function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onArchive, onDelete, onClick }) {
   const [subtasksOpen, setSubtasksOpen] = useState(false);
   const [stories, setStories] = useState([]);
   const [storiesLoading, setStoriesLoading] = useState(true);
@@ -319,7 +324,7 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onD
               <button type="button" onClick={(e) => { e.stopPropagation(); setOpenMenuId((c) => c === project._id ? null : project._id); }} className="rounded-lg p-1.5 text-white/45 transition hover:bg-white/10 hover:text-white">
                 <FaEllipsisH />
               </button>
-              {openMenuId === project._id && <ProjectMenu project={project} onClose={() => setOpenMenuId(null)} onDelete={() => onDelete(project)} />}
+              {openMenuId === project._id && <ProjectMenu project={project} onClose={() => setOpenMenuId(null)} onArchive={() => onArchive(project)} onDelete={() => onDelete(project)} />}
             </div>
           </div>
           <p className="mt-2.5 line-clamp-2 max-w-[92%] text-xs leading-5 text-white/45">{project.description || "No description provided"}</p>
@@ -435,6 +440,33 @@ export default function Projects() {
     }
   };
 
+  const handleArchiveProject = async (project) => {
+    const projectId = project?._id;
+    if (!projectId) return;
+
+    setOpenMenuId(null);
+    setProjects((prev) =>
+      prev.map((item) =>
+        item._id === projectId
+          ? { ...item, status: "archived", isArchived: true }
+          : item,
+      ),
+    );
+
+    try {
+      await projectService.updateProject(projectId, {
+        status: "archived",
+        isArchived: true,
+      });
+      setFilter("Archived");
+    } catch (err) {
+      setProjects((prev) =>
+        prev.map((item) => (item._id === projectId ? project : item)),
+      );
+      alert(err.message || "Failed to archive project.");
+    }
+  };
+
   const visibleProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
     return projects.filter((project) => {
@@ -494,7 +526,7 @@ export default function Projects() {
           {visibleProjects.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {visibleProjects.map((project, index) => (
-                <ProjectCard key={project._id} project={project} index={index} companyId={companyId} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} onDelete={(p) => setDeleteTarget(p)} onClick={(id) => navigate(`/projects/${id}`)} />
+                <ProjectCard key={project._id} project={project} index={index} companyId={companyId} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} onArchive={handleArchiveProject} onDelete={(p) => setDeleteTarget(p)} onClick={(id) => navigate(`/projects/${id}`)} />
               ))}
             </div>
           ) : (

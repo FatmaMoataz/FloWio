@@ -44,6 +44,13 @@ const STATUS = {
   },
 };
 
+const PROJECT_STATUS_COLORS = {
+  done: "#865dff",
+  inProgress: "#d86bff",
+  todo: "#59d3ff",
+  gap: "#07103a",
+};
+
 const statusToProgress = (s) => {
   if (STATUS.isDone(s)) return 100;
   if (STATUS.isInProgress(s)) return 50;
@@ -700,8 +707,14 @@ export default function Dashboard() {
   ];
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const projectProgressItems = [
+    ["Done", `${projectProgressStats.donePercent}%`, PROJECT_STATUS_COLORS.done],
+    ["In Progress", `${projectProgressStats.inProgressPercent}%`, PROJECT_STATUS_COLORS.inProgress],
+    ["To Do", `${projectProgressStats.toDoPercent}%`, PROJECT_STATUS_COLORS.todo],
+  ];
+
   return (
-    <MainLayout title="Dashboard">
+    <MainLayout title="Dashboard" showSearch={false}>
       <div className="grid min-h-0 gap-5 text-white lg:h-full lg:grid-rows-[clamp(78px,10vh,92px)_minmax(0,1fr)] xl:gap-6">
 
         {/* ── KPI CARDS ─────────────────────────────────────────────────────── */}
@@ -737,10 +750,17 @@ export default function Dashboard() {
 
             <div className="grid gap-6 sm:grid-cols-[160px_1fr] sm:items-center lg:h-[calc(100%-44px)] lg:grid-cols-[190px_1fr] lg:gap-7">
               {/* Donut */}
-              <div className="relative mx-auto h-[150px] w-[150px] rounded-full bg-[conic-gradient(#7b5dff_0deg_var(--done)_,#07103a_var(--done)_calc(var(--done)+6deg),#59d3ff_calc(var(--done)+6deg)_calc(var(--done)+6deg+var(--inp)),#07103a_calc(var(--done)+6deg+var(--inp))_calc(var(--done)+12deg+var(--inp)),#d86bff_calc(var(--done)+12deg+var(--inp))_360deg)] shadow-[0_0_38px_rgba(120,90,255,.30)] lg:h-[175px] lg:w-[175px]"
+              <div className="relative mx-auto h-[150px] w-[150px] rounded-full shadow-[0_0_38px_rgba(69,230,139,.20)] lg:h-[175px] lg:w-[175px]"
                 style={{
                   "--done": `${projectProgressStats.donePercent * 3.6}deg`,
                   "--inp":  `${projectProgressStats.inProgressPercent * 3.6}deg`,
+                  background: `conic-gradient(
+                    ${PROJECT_STATUS_COLORS.done} 0deg var(--done),
+                    ${PROJECT_STATUS_COLORS.gap} var(--done) calc(var(--done) + 6deg),
+                    ${PROJECT_STATUS_COLORS.inProgress} calc(var(--done) + 6deg) calc(var(--done) + 6deg + var(--inp)),
+                    ${PROJECT_STATUS_COLORS.gap} calc(var(--done) + 6deg + var(--inp)) calc(var(--done) + 12deg + var(--inp)),
+                    ${PROJECT_STATUS_COLORS.todo} calc(var(--done) + 12deg + var(--inp)) 360deg
+                  )`,
                 }}
               >
                 <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
@@ -754,11 +774,7 @@ export default function Dashboard() {
 
               {/* Bars */}
               <div className="space-y-4">
-                {[
-                  ["Done",        `${projectProgressStats.donePercent}%`,       "#7b5dff"],
-                  ["In Progress", `${projectProgressStats.inProgressPercent}%`, "#d86bff"],
-                  ["To Do",       `${projectProgressStats.toDoPercent}%`,       "#59d3ff"],
-                ].map(([label, value, color]) => (
+                {projectProgressItems.map(([label, value, color]) => (
                   <div key={label}>
                     <div className="mb-2 flex items-center justify-between text-[12px]">
                       <div className="flex min-w-0 items-center gap-3">

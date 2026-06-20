@@ -9,6 +9,7 @@ export default function MainLayout({
   searchValue,
   onSearchChange,
   searchPlaceholder,
+  showSearch = true,
 }) {
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   return (
@@ -24,6 +25,7 @@ export default function MainLayout({
                 searchValue={searchValue}
                 onSearchChange={onSearchChange}
                 searchPlaceholder={searchPlaceholder}
+                showSearch={showSearch}
               />
             )}
 
