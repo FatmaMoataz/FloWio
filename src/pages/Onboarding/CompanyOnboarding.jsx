@@ -150,7 +150,7 @@ export default function CompanyOnboarding() {
 
   return (
     <div className="flowio-auth-page min-h-screen bg-[radial-gradient(circle_at_bottom,#071c75_0%,#020617_38%,#030616_100%)] p-3 text-white sm:p-6">
-      <main className="flowio-onboarding mx-auto w-full max-w-[1420px] rounded-[24px] border border-blue-400/30 bg-[#060b24]/95 p-4 shadow-[0_0_60px_rgba(37,99,235,.28)] sm:rounded-[30px] sm:p-6 lg:p-8">
+      <main className="flowio-onboarding mx-auto w-full max-w-[1420px] rounded-[20px] border border-blue-400/30 bg-[#060b24]/95 p-3 shadow-[0_0_60px_rgba(37,99,235,.28)] sm:rounded-[30px] sm:p-6 lg:p-8">
         <header className="mb-7">
           <div className="flex items-center justify-center gap-4">
             <img
@@ -163,7 +163,7 @@ export default function CompanyOnboarding() {
             </h1>
           </div>
 
-          <div className="mx-auto mt-7 flex max-w-[600px] items-center justify-center text-xs sm:text-sm">
+          <div className="mx-auto mt-7 flex max-w-[600px] items-center justify-center text-[11px] sm:text-sm">
             {[
               [1, "Account"],
               [2, "Subscription"],
@@ -182,7 +182,7 @@ export default function CompanyOnboarding() {
                   >
                     {number < step ? <FaCheck /> : number}
                   </span>
-                  <span className={number === step ? "font-bold" : "text-white/50"}>
+                  <span className={number === step ? "hidden font-bold sm:inline" : "hidden text-white/50 sm:inline"}>
                     {label}
                   </span>
                 </div>
@@ -193,10 +193,10 @@ export default function CompanyOnboarding() {
         </header>
 
         <div className="grid gap-6 xl:grid-cols-[1.35fr_.85fr]">
-          <section className="rounded-[22px] border border-blue-300/10 bg-[#0a1033]/85 p-4 sm:p-6">
+          <section className="rounded-[20px] border border-blue-300/10 bg-[#0a1033]/85 p-3 sm:rounded-[22px] sm:p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-xl font-bold sm:text-2xl">
                   Choose your <span className="text-[#64CFFF]">subscription</span> plan
                 </h2>
                 <p className="mt-2 text-sm text-white/55">
@@ -204,7 +204,7 @@ export default function CompanyOnboarding() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-3 sm:text-sm">
                 <span className={billing === "monthly" ? "text-white" : "text-white/50"}>Monthly</span>
                 <button
                   type="button"
@@ -219,7 +219,7 @@ export default function CompanyOnboarding() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-3">
               {plans.map((item) => {
                 const selected = selectedPlan === item.id;
 
@@ -228,7 +228,7 @@ export default function CompanyOnboarding() {
                     key={item.id}
                     type="button"
                     onClick={() => selectPlan(item)}
-                    className={`relative flex min-h-[430px] flex-col rounded-[20px] border p-5 text-left transition ${
+                    className={`relative flex flex-col rounded-[18px] border p-4 text-left transition sm:rounded-[20px] sm:p-5 lg:min-h-[430px] ${
                       selected
                         ? "border-[#3f7cff] bg-[#111b50] shadow-[0_0_26px_rgba(63,124,255,.35)]"
                         : "border-white/10 bg-[#0d153d] hover:border-blue-300/35"
@@ -243,14 +243,14 @@ export default function CompanyOnboarding() {
                       {item.icon}
                     </span>
                     <h3 className="mt-4 text-xl font-bold">{item.name}</h3>
-                    <p className="mt-2 min-h-[48px] text-xs leading-5 text-white/55">
+                    <p className="mt-2 text-xs leading-5 text-white/55 lg:min-h-[48px]">
                       {item.description}
                     </p>
 
-                    <div className="my-5">
+                    <div className="my-4 sm:my-5">
                       {item.monthly ? (
                         <>
-                          <span className="text-4xl font-extrabold">
+                          <span className="text-3xl font-extrabold sm:text-4xl">
                             ${billing === "yearly" ? Math.round(item.monthly * 0.8) : item.monthly}
                           </span>
                           <span className="ml-1 text-xs text-white/55">/mo</span>
@@ -275,7 +275,7 @@ export default function CompanyOnboarding() {
                       ))}
                     </div>
 
-                    <span className={`mt-auto flex h-11 items-center justify-center rounded-[14px] font-bold ${
+                    <span className={`mt-5 flex h-11 items-center justify-center rounded-[14px] font-bold lg:mt-auto ${
                       selected ? "bg-[#245df5] text-white" : "bg-[#19265f] text-white/85"
                     }`}>
                       {selected ? "Selected" : item.monthly ? `Choose ${item.name}` : "Contact Sales"}
@@ -286,7 +286,7 @@ export default function CompanyOnboarding() {
             </div>
 
             <div className="mt-5 rounded-[20px] border border-white/10 bg-[#0d153d] p-4 sm:p-5">
-              <div className="grid gap-5 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+              <div className="grid gap-5 md:grid-cols-[1fr_auto_1fr] md:items-center">
                 <div className="flex items-center gap-4">
                   <span className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-blue-400/30 bg-blue-400/10 text-xl text-[#64CFFF]">
                     {plan.icon}
@@ -299,7 +299,7 @@ export default function CompanyOnboarding() {
 
                 <div>
                   <p className="mb-2 text-xs text-white/55">Seats</p>
-                  <div className="flex h-10 items-center rounded-xl border border-white/15">
+                  <div className="flex h-10 w-full max-w-[180px] items-center justify-between rounded-xl border border-white/15">
                     <button type="button" onClick={() => setSeats((current) => Math.max(1, current - 1))} className="h-full px-4"><FaMinus /></button>
                     <span className="min-w-10 text-center font-bold">{seats}</span>
                     <button type="button" onClick={() => setSeats((current) => Math.min(plan.limit, current + 1))} className="h-full px-4"><FaPlus /></button>
@@ -309,9 +309,9 @@ export default function CompanyOnboarding() {
                 <div className="space-y-2 text-sm">
                   {plan.monthly ? (
                     <>
-                      <p className="flex justify-between gap-8"><span className="text-white/55">Subtotal</span><b>${subtotal.toFixed(2)}</b></p>
-                      <p className="flex justify-between gap-8"><span className="text-white/55">Tax (10%)</span><b>${tax.toFixed(2)}</b></p>
-                      <p className="flex justify-between gap-8 border-t border-white/10 pt-2 text-base"><span>Total due today</span><b className="text-[#64CFFF]">${total.toFixed(2)}</b></p>
+                      <p className="flex justify-between gap-4"><span className="text-white/55">Subtotal</span><b>${subtotal.toFixed(2)}</b></p>
+                      <p className="flex justify-between gap-4"><span className="text-white/55">Tax (10%)</span><b>${tax.toFixed(2)}</b></p>
+                      <p className="flex justify-between gap-4 border-t border-white/10 pt-2 text-base"><span>Total due today</span><b className="text-[#64CFFF]">${total.toFixed(2)}</b></p>
                     </>
                   ) : (
                     <p className="text-white/65">Our sales team will create custom pricing for your organization.</p>

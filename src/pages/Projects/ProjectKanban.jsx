@@ -324,32 +324,32 @@ const handleDeleteStory = async () => {
 
   return (
     <MainLayout>
-      <section className="h-[calc(100vh-120px)] overflow-y-auto overflow-x-hidden pb-20 pr-2 text-white">
-        <div className="mb-6 flex items-center justify-between">
+      <section className="overflow-visible pb-10 text-white lg:h-[calc(100vh-120px)] lg:overflow-y-auto lg:overflow-x-hidden lg:pb-20 lg:pr-2">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="mb-4 flex items-center gap-3 text-sm">
+            <div className="mb-4 flex min-w-0 flex-wrap items-center gap-3 text-sm">
               <button type="button" onClick={() => navigate(`/projects/${projectId}`)} className="text-white/60 transition hover:text-[#6eb5ff]"><FaArrowLeft /></button>
               <span className="text-white/45">Projects</span><span className="text-white/30">›</span>
-              <h1 className="text-[22px] font-extrabold tracking-[-.3px]">{boardTitle} Kanban Board</h1>
+              <h1 className="min-w-0 text-[18px] font-extrabold tracking-[-.3px] sm:text-[22px]">{boardTitle} Kanban Board</h1>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex h-11 w-[285px] items-center gap-3 rounded-[17px] border border-blue-300/10 bg-[#141d66]/90 px-4 shadow-[0_12px_26px_rgba(0,0,0,.18)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <div className="flex h-11 w-full items-center gap-3 rounded-[17px] border border-blue-300/10 bg-[#141d66]/90 px-4 shadow-[0_12px_26px_rgba(0,0,0,.18)] sm:w-[285px]">
                 <FaSearch className="text-sm text-white/45" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search stories..." className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/45" />
               </div>
               <span className="text-xs text-white/40">{stories.length} stories</span>
             </div>
           </div>
-          <button type="button" onClick={() => navigate(`/projects/${projectId}/stories/new`)} className="group flex h-12 items-center gap-3 rounded-full bg-gradient-to-r from-[#6eb5ff] via-[#7aa8ff] to-[#5b7dff] px-7 text-sm font-bold shadow-[0_0_30px_rgba(95,150,255,.35)] transition-all duration-300 hover:scale-105">
+          <button type="button" onClick={() => navigate(`/projects/${projectId}/stories/new`)} className="group flex h-12 w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-[#6eb5ff] via-[#7aa8ff] to-[#5b7dff] px-7 text-sm font-bold shadow-[0_0_30px_rgba(95,150,255,.35)] transition-all duration-300 hover:scale-105 sm:w-auto">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 transition-all group-hover:rotate-90"><FaPlus /></span>Add Story
           </button>
         </div>
 
-        <div className="grid min-h-max grid-cols-4 gap-5 overflow-visible">
+        <div className="grid min-h-max grid-cols-1 gap-5 overflow-visible md:grid-cols-2 xl:grid-cols-4">
           {COLUMNS.map((column) => {
             const columnStories = filteredStories.filter((story) => story.status === column.id);
             return (
-              <div key={column.id} className="relative flex h-[720px] flex-col overflow-visible rounded-[28px] border border-blue-300/10 bg-gradient-to-b from-[#151e66]/95 to-[#0a0f3d]/95 p-4 shadow-[0_24px_55px_rgba(0,0,0,.28)]">
+              <div key={column.id} className="relative flex min-h-[360px] flex-col overflow-visible rounded-[24px] border border-blue-300/10 bg-gradient-to-b from-[#151e66]/95 to-[#0a0f3d]/95 p-4 shadow-[0_24px_55px_rgba(0,0,0,.28)] xl:h-[720px] xl:rounded-[28px]">
                 <div className="mb-4 flex shrink-0 items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: column.color }} />

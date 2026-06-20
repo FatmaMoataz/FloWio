@@ -309,15 +309,15 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onA
       role="button" tabIndex={0}
       onClick={() => onClick(project._id)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(project._id); } }}
-      className="flowio-project-card group relative flex flex-col rounded-[26px] border border-[#263774]/35 bg-[radial-gradient(ellipse_at_52%_48%,rgba(27,42,90,.76)_0%,rgba(15,25,65,.94)_58%,rgba(9,17,52,.98)_100%)] p-6 shadow-[0_18px_42px_rgba(1,4,26,.25)] transition duration-300 hover:-translate-y-1 hover:border-white/[0.09] hover:shadow-[0_22px_48px_rgba(1,4,26,.34)] sm:p-7"
+      className="flowio-project-card group relative flex flex-col rounded-[22px] border border-[#263774]/35 bg-[radial-gradient(ellipse_at_52%_48%,rgba(27,42,90,.76)_0%,rgba(15,25,65,.94)_58%,rgba(9,17,52,.98)_100%)] p-4 shadow-[0_18px_42px_rgba(1,4,26,.25)] transition duration-300 hover:-translate-y-1 hover:border-white/[0.09] hover:shadow-[0_22px_48px_rgba(1,4,26,.34)] sm:rounded-[26px] sm:p-7"
     >
       <div className="flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-xl" style={{ color: color.hex, backgroundColor: color.soft, borderColor: `${color.hex}45` }}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-lg sm:h-12 sm:w-12 sm:text-xl" style={{ color: color.hex, backgroundColor: color.soft, borderColor: `${color.hex}45` }}>
           <FaFolderOpen />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <h3 onClick={(e) => { e.stopPropagation(); onClick(project._id); }} className="truncate text-left text-[17px] font-semibold transition hover:text-[#82b6ff] cursor-pointer">
+            <h3 onClick={(e) => { e.stopPropagation(); onClick(project._id); }} className="truncate text-left text-[15px] font-semibold transition hover:text-[#82b6ff] cursor-pointer sm:text-[17px]">
               {project.name}
             </h3>
             <div className="relative">
@@ -327,7 +327,7 @@ function ProjectCard({ project, index, companyId, openMenuId, setOpenMenuId, onA
               {openMenuId === project._id && <ProjectMenu project={project} onClose={() => setOpenMenuId(null)} onArchive={() => onArchive(project)} onDelete={() => onDelete(project)} />}
             </div>
           </div>
-          <p className="mt-2.5 line-clamp-2 max-w-[92%] text-xs leading-5 text-white/45">{project.description || "No description provided"}</p>
+          <p className="mt-2.5 line-clamp-3 text-xs leading-5 text-white/45 sm:line-clamp-2 sm:max-w-[92%]">{project.description || "No description provided"}</p>
         </div>
       </div>
 
@@ -483,7 +483,7 @@ export default function Projects() {
   if (loading) {
     return (
       <MainLayout title="Projects" searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search projects...">
-        <section className="flowio-projects-page mt-4 flex h-full min-h-[620px] items-center justify-center rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_44%,#090c4f_0%,#070933_42%,#061164_74%,#090c4f_100%)] p-4 sm:p-7 lg:mt-3 lg:min-h-0">
+        <section className="flowio-projects-page mt-4 flex min-h-[420px] items-center justify-center rounded-[22px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_44%,#090c4f_0%,#070933_42%,#061164_74%,#090c4f_100%)] p-4 sm:rounded-[30px] sm:p-7 lg:mt-3 lg:h-full lg:min-h-0">
           <div className="text-center"><FaSpinner className="mx-auto mb-4 animate-spin text-3xl text-[#5f9be8]" /><p className="text-lg font-medium text-white/60">Loading projects...</p></div>
         </section>
       </MainLayout>
@@ -493,7 +493,7 @@ export default function Projects() {
   if (error && !projects.length) {
     return (
       <MainLayout title="Projects" searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search projects...">
-        <section className="flowio-projects-page mt-4 flex h-full min-h-[620px] items-center justify-center rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_44%,#090c4f_0%,#070933_42%,#061164_74%,#090c4f_100%)] p-4 sm:p-7 lg:mt-3 lg:min-h-0">
+        <section className="flowio-projects-page mt-4 flex min-h-[420px] items-center justify-center rounded-[22px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_44%,#090c4f_0%,#070933_42%,#061164_74%,#090c4f_100%)] p-4 sm:rounded-[30px] sm:p-7 lg:mt-3 lg:h-full lg:min-h-0">
           <div className="max-w-md text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10"><FaExclamationTriangle className="text-2xl text-rose-400" /></div>
             <h3 className="text-lg font-semibold text-white/80">Failed to Load Projects</h3>
@@ -507,22 +507,22 @@ export default function Projects() {
 
   return (
     <MainLayout title="Projects" searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search projects...">
-      <section className="flowio-projects-page mt-4 flex h-full min-h-[620px] flex-col overflow-hidden rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_44%,#090c4f_0%,#070933_42%,#061164_74%,#090c4f_100%)] p-4 text-white sm:p-7 lg:mt-3 lg:min-h-0">
+      <section className="flowio-projects-page mt-4 flex min-h-[520px] flex-col overflow-visible rounded-[22px] border border-[#18226f]/60 bg-[radial-gradient(ellipse_at_48%_44%,#090c4f_0%,#070933_42%,#061164_74%,#090c4f_100%)] p-4 text-white sm:rounded-[30px] sm:p-7 lg:mt-3 lg:h-full lg:min-h-0 lg:overflow-hidden">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex gap-6 overflow-x-auto sm:gap-10">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-10 sm:overflow-x-auto">
             {FILTERS.map((item) => (
-              <button key={item} type="button" onClick={() => setFilter(item)} className={`relative whitespace-nowrap pb-2 text-sm font-medium transition sm:text-base ${filter === item ? "text-[#a7b8ff]" : "text-white/55 hover:text-white/80"}`}>
+              <button key={item} type="button" onClick={() => setFilter(item)} className={`relative rounded-xl px-3 py-2 text-left text-sm font-medium transition sm:rounded-none sm:px-0 sm:pb-2 sm:text-base ${filter === item ? "bg-blue-300/10 text-[#a7b8ff] sm:bg-transparent" : "text-white/55 hover:text-white/80"}`}>
                 {item}
                 {filter === item && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#9fb2ff]" />}
               </button>
             ))}
           </div>
-          <button type="button" onClick={() => navigate("/projects/new")} className="flex items-center justify-center gap-2 rounded-full bg-[#5f9be8] px-6 py-2.5 text-sm font-medium shadow-[0_8px_22px_rgba(74,137,230,.22)] transition hover:-translate-y-0.5 hover:bg-[#70a9ef] active:scale-95">
+          <button type="button" onClick={() => navigate("/projects/new")} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#5f9be8] px-6 py-3 text-sm font-medium shadow-[0_8px_22px_rgba(74,137,230,.22)] transition hover:-translate-y-0.5 hover:bg-[#70a9ef] active:scale-95 sm:w-auto sm:py-2.5">
             <FaPlus className="text-[10px]" /> New Project
           </button>
         </div>
 
-        <div className="mt-8 min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="mt-6 min-h-0 flex-1 overflow-visible pr-0 sm:mt-8 lg:overflow-y-auto lg:pr-1">
           {visibleProjects.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {visibleProjects.map((project, index) => (
