@@ -15,6 +15,7 @@ import {
   FaInfoCircle,
   FaSpinner,
 } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const API_BASE = "https://flowio-backend.vercel.app/api";
@@ -98,6 +99,7 @@ export default function SecuritySettings() {
   // ── 2FA ──
   const [twoFA, setTwoFA] = useState(false);
   const [twoFALoading, setTwoFALoading] = useState(false);
+  const navigate = useNavigate();
 
   // ── Sessions ──
   const [sessions, setSessions] = useState([
@@ -212,22 +214,44 @@ export default function SecuritySettings() {
   };
 
   // ── Logout all devices — calls POST /api/auth/logout-all ──
+  // const logoutAllDevices = async () => {
+  //   setLogoutAllLoading(true);
+  //   try {
+  //     await apiRequest("/auth/logout-all", { method: "POST" });
+  //     setSessions((prev) =>
+  //       prev.map((s) =>
+  //         s.current ? s : { ...s, active: false, status: "Logged Out", time: "Just now" }
+  //       )
+  //     );
+  //     showToast("All other devices logged out", "success");
+  //   } catch (err) {
+  //     showToast(err.message || "Failed to logout all devices", "error");
+  //   } finally {
+  //     setLogoutAllLoading(false);
+  //   }
+  // };
   const logoutAllDevices = async () => {
-    setLogoutAllLoading(true);
-    try {
-      await apiRequest("/auth/logout-all", { method: "POST" });
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.current ? s : { ...s, active: false, status: "Logged Out", time: "Just now" }
-        )
-      );
-      showToast("All other devices logged out", "success");
-    } catch (err) {
-      showToast(err.message || "Failed to logout all devices", "error");
-    } finally {
-      setLogoutAllLoading(false);
-    }
-  };
+  setLogoutAllLoading(true);
+  try {
+    await apiRequest("/auth/logout-all", { method: "POST" });
+
+    // logout-all revokes every refresh token for this user — including
+    // this browser's session — so we need to actually log out here too.
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userAvatar");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("companyId");
+    localStorage.removeItem("userId");
+
+    showToast("Logged out from all devices", "success");
+    setTimeout(() => navigate("/login"), 800); // brief pause so the toast is visible
+  } catch (err) {
+    showToast(err.message || "Failed to logout all devices", "error");
+    setLogoutAllLoading(false);
+  }
+};
 
   // ── Download security report ──
   const downloadReport = () => {
