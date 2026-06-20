@@ -17,8 +17,14 @@ export default function MainLayout({
   return (
     <div className="flowio-app-shell flex min-h-screen w-full flex-col items-center overflow-x-hidden bg-[linear-gradient(90deg,#040511_0%,#050716_48%,#070933_100%)] px-2 py-2 sm:px-5 sm:py-5 lg:px-0 lg:py-8">
       {navOpen && (
-        <div className="fixed inset-0 z-[1200] bg-[#020414]/75 p-3 backdrop-blur-sm md:hidden" onClick={() => setNavOpen(false)}>
-          <div className="relative h-full max-w-[320px]" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[1200] bg-[#020414]/75 p-3 backdrop-blur-sm md:hidden"
+          onClick={() => setNavOpen(false)}
+        >
+          <div
+            className="relative h-full max-w-[320px]"
+            onClick={(event) => event.stopPropagation()}
+          >
             <button
               type="button"
               onClick={() => setNavOpen(false)}
@@ -32,10 +38,10 @@ export default function MainLayout({
         </div>
       )}
       <div className="flowio-app-frame relative min-h-[calc(100vh-16px)] w-full rounded-[20px] bg-gradient-to-r from-[#1D1E62] to-[#1B1B34] p-[2px] shadow-[0_0_42px_rgba(28,35,109,.45)] sm:min-h-[calc(100vh-40px)] sm:rounded-[28px] lg:h-[clamp(760px,88vh,980px)] lg:min-h-0 lg:w-[92vw] lg:rounded-[32px] lg:p-[3px]">
-        <div className="flowio-app-surface flex min-h-[calc(100vh-20px)] w-full flex-col overflow-visible rounded-[18px] bg-[radial-gradient(circle_at_50%_47%,#090C4F_0%,#090C4F_28%,#070933_58%,#050716_100%)] p-3 sm:min-h-[calc(100vh-44px)] sm:rounded-[26px] sm:p-4 md:flex-row md:overflow-hidden md:p-5 lg:h-full lg:min-h-0 lg:rounded-[29px] lg:p-6">
+        <div className="flowio-app-surface flex min-h-[calc(100vh-20px)] w-full flex-col overflow-visible rounded-[18px] bg-[radial-gradient(circle_at_50%_47%,#090C4F_0%,#090C4F_28%,#070933_58%,#050716_100%)] p-3 sm:min-h-[calc(100vh-44px)] sm:rounded-[26px] sm:p-4 md:flex-row md:p-5 lg:h-full lg:min-h-0 lg:overflow-hidden lg:rounded-[29px] lg:p-6">
           <Sidebar />
 
-          <div className="min-w-0 flex-1 pt-4 md:h-full md:overflow-hidden md:pl-5 md:pt-0 lg:pl-7">
+          <div className="min-w-0 flex-1 pt-4 md:pl-5 md:pt-0 lg:h-full lg:overflow-hidden lg:pl-7">
             {title && (
               <Topbar
                 title={title}
@@ -50,8 +56,8 @@ export default function MainLayout({
             <div
               className={
                 title
-                  ? "min-h-0 md:h-[calc(100%-60px)] md:overflow-hidden"
-                  : "min-h-0 md:h-full md:overflow-hidden"
+                  ? "min-h-0 lg:h-[calc(100%-60px)] lg:overflow-hidden"
+                  : "min-h-0 lg:h-full lg:overflow-hidden"
               }
             >
               {children}
