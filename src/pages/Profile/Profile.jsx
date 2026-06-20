@@ -6,6 +6,7 @@ import userService from "../../services/userService";
 import API from "../../services/api";
 import projectService from "../../services/projectService";
 import storyService from "../../services/storyService";
+import taskService from "../../services/taskService";
 
 import {
   FaLaptopCode,
@@ -36,6 +37,7 @@ export default function Profile() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [taskCount, setTaskCount] = useState(0);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [taskProgress, setTaskProgress] = useState(0); // % of tasks completed
   
   // New state for teams
   const [teams, setTeams] = useState([]);
@@ -207,28 +209,49 @@ export default function Profile() {
           }
         };
 
+        // const fetchProfileTasks = async () => {
+        //   try {
+        //     const response = await fetch(`https://flowio-backend.vercel.app/api/tasks/my-tasks`, {
+        //       method: "GET",
+        //       headers: {
+        //         "Content-Type": "application/json",
+        //         "x-auth-token": token,
+        //         "Authorization": `Bearer ${token}`
+        //       },
+        //     });
+        //     if (response.ok) {
+        //       const resData = await response.json();
+        //       const fetchedTasks = resData.data || (Array.isArray(resData) ? resData : resData.tasks || []);
+        //       setTaskCount(fetchedTasks.length);
+        //     }
+        //   } catch (err) {
+        //     console.error("Error fetching tasks count for profile:", err);
+        //     setTaskCount(0);
+        //   } finally {
+        //     setLoadingTasks(false);
+        //   }
+        // };
         const fetchProfileTasks = async () => {
-          try {
-            const response = await fetch(`https://flowio-backend.vercel.app/api/tasks/my-tasks`, {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                "x-auth-token": token,
-                "Authorization": `Bearer ${token}`
-              },
-            });
-            if (response.ok) {
-              const resData = await response.json();
-              const fetchedTasks = resData.data || (Array.isArray(resData) ? resData : resData.tasks || []);
-              setTaskCount(fetchedTasks.length);
-            }
-          } catch (err) {
-            console.error("Error fetching tasks count for profile:", err);
-            setTaskCount(0);
-          } finally {
-            setLoadingTasks(false);
-          }
-        };
+  try {
+    const tasks = await taskService.getMyTasks(); // all my tasks, no filter
+    const list = Array.isArray(tasks) ? tasks : [];
+    setTaskCount(list.length);
+
+    const doneCount = list.filter((t) => {
+      const status = String(t?.status || "").toLowerCase();
+      return status === "done" || status === "completed";
+    }).length;
+
+    const percent = list.length ? Math.round((doneCount / list.length) * 100) : 0;
+    setTaskProgress(percent);
+  } catch (err) {
+    console.error("Error fetching tasks count for profile:", err);
+    setTaskCount(0);
+    setTaskProgress(0);
+  } finally {
+    setLoadingTasks(false);
+  }
+};
 
         // Fetch teams using the companyId
         if (companyId) {
@@ -415,7 +438,7 @@ export default function Profile() {
 
           <div className="mb-5 grid grid-cols-3 gap-2">
             {[
-              [<FaChartLine />, "80%", "Progress"],
+              [<FaChartLine />, loadingTasks ? "..." : `${taskProgress}%`, "Progress"],
               [<FaTasks />, loadingTasks ? "..." : `${taskCount}`, "Tasks"],
               [<FaUsers />, loadingTeams ? "..." : `${teams.length}`, "Teams"],
             ].map((item) => (
