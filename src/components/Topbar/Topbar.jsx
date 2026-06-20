@@ -20,7 +20,7 @@ export default function Topbar({
           <button
             type="button"
             onClick={onMenuClick}
-            className="flowio-topbar-control flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-blue-300/10 bg-[#141d66]/90 text-white transition hover:brightness-125 lg:hidden"
+            className="flowio-topbar-control flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-blue-300/10 bg-[#141d66]/90 text-white transition hover:brightness-125 md:hidden"
             aria-label="Open navigation menu"
           >
             <FaBars />

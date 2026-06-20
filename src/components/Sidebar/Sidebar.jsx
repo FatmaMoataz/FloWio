@@ -52,7 +52,7 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
       className={`flowio-sidebar flex shrink-0 border border-white/5 bg-[#0f1437]/90 ${
         isMobile
           ? "h-full w-full flex-col gap-4 overflow-y-auto rounded-[24px] px-4 py-5"
-          : "hidden h-full w-[92px] flex-col items-center justify-between gap-2 overflow-visible rounded-[28px] px-0 py-5 lg:flex"
+          : "hidden h-full w-[78px] flex-col items-center justify-between gap-2 overflow-visible rounded-[24px] px-0 py-4 md:flex lg:w-[92px] lg:rounded-[28px] lg:py-5"
       }`}
     >
       {/* LOGO */}
@@ -104,8 +104,10 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
               text-[17px]
               transition-all
               duration-300
+              md:h-11
+              md:rounded-[16px]
+              md:text-[18px]
               lg:h-12
-              lg:rounded-[16px]
               lg:text-[20px]
               ${
                 isActive
@@ -138,9 +140,12 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
           text-[17px]
           transition-all
           duration-300
-          lg:w-12
+          md:h-11
+          md:w-11
+          md:rounded-[16px]
+          md:text-[18px]
           lg:h-12
-          lg:rounded-[16px]
+          lg:w-12
           lg:text-[20px]
           ${
             isActive

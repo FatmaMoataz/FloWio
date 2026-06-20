@@ -16,9 +16,9 @@ export default function SettingsTabs() {
 
   return (
     <div className="flex h-full min-h-0 flex-col text-white">
-      <div className="mb-8 flex items-start justify-between gap-8">
+      <div className="mb-6 flex flex-col gap-4 sm:mb-8 md:flex-row md:items-start md:justify-between md:gap-8">
         <div>
-          <h2 className="text-[25px] font-extrabold tracking-[-0.4px]">
+          <h2 className="text-[22px] font-extrabold tracking-[-0.4px] sm:text-[25px]">
             Settings
           </h2>
           <p className="mt-2 text-[12px] text-white/45">
@@ -26,7 +26,7 @@ export default function SettingsTabs() {
           </p>
         </div>
 
-        <div className="flex h-11 w-full max-w-[300px] items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4">
+        <div className="flex h-11 w-full items-center gap-3 rounded-[16px] border border-blue-300/10 bg-[#141d66]/90 px-4 md:max-w-[300px]">
           <FaSearch className="text-xs text-white/40" />
           <input
             placeholder="Search settings..."
@@ -35,12 +35,12 @@ export default function SettingsTabs() {
         </div>
       </div>
 
-      <div className="mb-8 flex gap-7 border-b border-white/10">
+      <div className="mb-6 grid grid-cols-3 gap-2 border-b border-white/10 sm:mb-8 sm:flex sm:gap-7">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`relative flex items-center gap-2.5 px-1 pb-4 text-[14px] font-bold transition ${
+            className={`relative flex items-center justify-center gap-2 rounded-t-xl px-2 pb-4 pt-2 text-[12px] font-bold transition sm:justify-start sm:px-1 sm:pt-0 sm:text-[14px] ${
               activeTab === tab.id
                 ? "text-[#82b6ff]"
                 : "text-white/50 hover:text-white"
@@ -56,7 +56,7 @@ export default function SettingsTabs() {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+      <div className="min-h-0 flex-1 overflow-visible pr-0 md:overflow-y-auto md:pr-2">
         {activeTab === "general" && <GeneralSettings />}
         {activeTab === "security" && <SecuritySettings />}
         {activeTab === "account" && <AccountSettings />}
