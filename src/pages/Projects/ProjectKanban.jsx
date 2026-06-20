@@ -244,44 +244,72 @@ export default function ProjectKanban() {
     return stories.filter(s => s.title?.toLowerCase().includes(query) || s.description?.toLowerCase().includes(query));
   }, [stories, search]);
 
-  const handleStatusChange = async (storyId, newStatus) => {
-    setStories((prev) => prev.map((s) => (s._id === storyId ? { ...s, status: newStatus } : s)));
-    try {
-      await storyService.updateStory(storyId, { status: newStatus });
-      const updatedStories = stories.map((s) => s._id === storyId ? { ...s, status: newStatus } : s);
-      const allDone = updatedStories.length > 0 && updatedStories.every(s => s.status === "Done");
-      if (allDone) {
-        await projectService.updateProject(projectId, { status: "completed" });
-        setProject((prev) => prev ? { ...prev, status: "completed" } : null);
-      } else if (project?.status === "completed") {
-        await projectService.updateProject(projectId, { status: "active" });
-        setProject((prev) => prev ? { ...prev, status: "active" } : null);
-      }
-    } catch (err) {
-      console.error("Failed to update story status:", err);
-      fetchData();
-    }
-  };
+  // const handleStatusChange = async (storyId, newStatus) => {
+  //   setStories((prev) => prev.map((s) => (s._id === storyId ? { ...s, status: newStatus } : s)));
+  //   try {
+  //     await storyService.updateStory(storyId, { status: newStatus });
+  //     const updatedStories = stories.map((s) => s._id === storyId ? { ...s, status: newStatus } : s);
+  //     const allDone = updatedStories.length > 0 && updatedStories.every(s => s.status === "Done");
+  //     if (allDone) {
+  //       await projectService.updateProject(projectId, { status: "completed" });
+  //       setProject((prev) => prev ? { ...prev, status: "completed" } : null);
+  //     } else if (project?.status === "completed") {
+  //       await projectService.updateProject(projectId, { status: "active" });
+  //       setProject((prev) => prev ? { ...prev, status: "active" } : null);
+  //     }
+  //   } catch (err) {
+  //     console.error("Failed to update story status:", err);
+  //     fetchData();
+  //   }
+  // };
 
-  const handleDeleteStory = async () => {
-    if (!deleteStoryId) return;
-    try {
-      setIsDeleting(true);
-      await storyService.deleteStory(deleteStoryId);
-      const remaining = stories.filter((s) => s._id !== deleteStoryId);
-      setStories(remaining);
-      const allDone = remaining.length > 0 && remaining.every(s => s.status === "Done");
-      if (!allDone && project?.status === "completed") {
-        await projectService.updateProject(projectId, { status: "active" });
-        setProject((prev) => prev ? { ...prev, status: "active" } : null);
-      }
-      setDeleteStoryId(null);
-    } catch (err) {
-      alert("Failed to delete story.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  // const handleDeleteStory = async () => {
+  //   if (!deleteStoryId) return;
+  //   try {
+  //     setIsDeleting(true);
+  //     await storyService.deleteStory(deleteStoryId);
+  //     const remaining = stories.filter((s) => s._id !== deleteStoryId);
+  //     setStories(remaining);
+  //     const allDone = remaining.length > 0 && remaining.every(s => s.status === "Done");
+  //     if (!allDone && project?.status === "completed") {
+  //       await projectService.updateProject(projectId, { status: "active" });
+  //       setProject((prev) => prev ? { ...prev, status: "active" } : null);
+  //     }
+  //     setDeleteStoryId(null);
+  //   } catch (err) {
+  //     alert("Failed to delete story.");
+  //   } finally {
+  //     setIsDeleting(false);
+  //   }
+  // };
+
+const handleStatusChange = async (storyId, newStatus) => {
+  setStories((prev) => prev.map((s) => (s._id === storyId ? { ...s, status: newStatus } : s)));
+  try {
+    await storyService.updateStory(storyId, { status: newStatus });
+    const statusRes = await projectService.updateProjectStatusFromStories(projectId);
+    if (statusRes?.data) setProject(statusRes.data);
+  } catch (err) {
+    console.error("Failed to update story status:", err);
+    fetchData();
+  }
+};
+
+const handleDeleteStory = async () => {
+  if (!deleteStoryId) return;
+  try {
+    setIsDeleting(true);
+    await storyService.deleteStory(deleteStoryId);
+    setStories((prev) => prev.filter((s) => s._id !== deleteStoryId));
+    const statusRes = await projectService.updateProjectStatusFromStories(projectId);
+    if (statusRes?.data) setProject(statusRes.data);
+    setDeleteStoryId(null);
+  } catch (err) {
+    alert("Failed to delete story.");
+  } finally {
+    setIsDeleting(false);
+  }
+};
 
   const boardTitle = project?.name || "Kanban Board";
   const deleteStoryTitle = stories.find((s) => s._id === deleteStoryId)?.title || "";
