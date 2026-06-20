@@ -10,10 +10,20 @@ const authService = {
     }
   },
 
-  resetPassword: async (resetToken, newPassword) => {
+  verifyOtp: async (email, otp) => {
+    try {
+      const response = await API.post("/api/auth/verify-otp", { email, otp });
+      return response.data;
+    } catch (error) {
+      throw handleError(error);
+    }
+  },
+
+  resetPassword: async (email, otp, newPassword) => {
     try {
       const response = await API.post("/api/auth/reset-password", {
-        resetToken,
+        email,
+        otp,
         newPassword,
       });
       return response.data;
