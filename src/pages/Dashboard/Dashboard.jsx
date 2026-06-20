@@ -94,6 +94,25 @@ const extractAssigneeIds = (task) => {
     .filter(Boolean);
 };
 
+const extractStoryAssigneeIds = (story) => {
+  const field = story.assignee ?? story.assigneeId ?? story.assignedTo ?? story.assigned_to;
+  if (!field) return [];
+  return (Array.isArray(field) ? field : [field])
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === "object") return String(item._id || item.id || "");
+      return String(item);
+    })
+    .filter(Boolean);
+};
+
+const normalizeStoryForDiscipline = (story, project) => ({
+  ...story,
+  title: story.title || story.name || "Untitled story",
+  dueDate: story.dueDate || story.due_date || project?.endDate,
+  priority: story.priority || project?.priority,
+});
+
 /** Returns a display label + color class for a task status */
 const statusBadge = (s) => {
   if (STATUS.isDone(s))       return { label: "Done",        cls: "bg-emerald-400/20 text-emerald-300" };
@@ -165,7 +184,7 @@ function MemberTaskCard({ person }) {
               <p className="text-[9px] text-white/35">{doneCount}/{totalTasks} done</p>
             </div>
           ) : (
-            <span className="text-[11px] text-white/25">No tasks</span>
+            <span className="text-[11px] text-white/25">No stories</span>
           )}
 
           {/* Task count badges */}
@@ -233,13 +252,13 @@ function MemberTaskCard({ person }) {
           {/* Done section (collapsed summary) */}
           {doneTasks.length > 0 && (
             <p className="text-[10px] text-white/25">
-              + {doneTasks.length} completed task{doneTasks.length > 1 ? "s" : ""}
+              + {doneTasks.length} completed stor{doneTasks.length > 1 ? "ies" : "y"}
             </p>
           )}
 
           {/* No to-do or in-progress */}
           {todoTasks.length === 0 && inProgressTasks.length === 0 && (
-            <p className="text-[11px] text-white/30">All tasks completed 🎉</p>
+            <p className="text-[11px] text-white/30">All stories completed</p>
           )}
         </div>
       )}
@@ -256,7 +275,7 @@ function TaskRow({ task }) {
     <div className="flex items-center gap-2 rounded-[10px] bg-white/5 px-3 py-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-[12px] font-medium text-white/85">
-          {task.title || "Untitled task"}
+          {task.title || "Untitled story"}
         </p>
         {task.dueDate && (
           <p className="text-[10px] text-white/30">
@@ -318,6 +337,7 @@ export default function Dashboard() {
 
         // ── 1. Projects ──────────────────────────────────────────────────────
         let fetchedProjects = [];
+        let allProjectStories = [];
         if (companyId) {
           setLoadingProjects(true);
           try {
@@ -334,9 +354,14 @@ export default function Dashboard() {
                   try {
                     const storiesRes = await storyService.getStoriesByProject(project._id || project.id);
                     const stories = storiesRes?.data || storiesRes || [];
+                    const projectStories = Array.isArray(stories) ? stories : [];
+                    allProjectStories = [
+                      ...allProjectStories,
+                      ...projectStories.map((story) => normalizeStoryForDiscipline(story, project)),
+                    ];
                     return {
                       ...project,
-                      progress: calculateProjectProgress(project, Array.isArray(stories) ? stories : []),
+                      progress: calculateProjectProgress(project, projectStories),
                     };
                   } catch (err) {
                     console.error(`Stories fetch error for dashboard project ${project._id || project.id}:`, err);
@@ -549,14 +574,14 @@ export default function Dashboard() {
 
               // b) Distribute tasks to their assignees
               //    extractAssigneeIds handles both { _id } objects and raw ID strings
-              allTasks.forEach((task) => {
-                const ids = extractAssigneeIds(task);
+              allProjectStories.forEach((story) => {
+                const ids = extractStoryAssigneeIds(story);
                 ids.forEach((id) => {
                   // Some tasks may be assigned to users not on any team we fetched —
                   // we still track them so their to-do list is correct.
                   if (!personMap.has(id)) {
                     // Try to pull name/role from the populated assignedTo field
-                    const field = task.assignedTo ?? task.assignee ?? task.assigned_to;
+                    const field = story.assignee ?? story.assigneeId ?? story.assignedTo ?? story.assigned_to;
                     const items = Array.isArray(field) ? field : [field];
                     const match = items.find(
                       (item) => item && typeof item === "object" &&
@@ -569,7 +594,7 @@ export default function Dashboard() {
                       tasks: [],
                     });
                   }
-                  personMap.get(id).tasks.push(task);
+                  personMap.get(id).tasks.push(story);
                 });
               });
 
@@ -787,7 +812,7 @@ export default function Dashboard() {
             <div className="mb-5 flex shrink-0 items-center justify-between">
               <div>
                 <h3 className="text-[17px] font-bold">Team Discipline</h3>
-                <p className="mt-0.5 text-[11px] text-white/35">Click a member to see their tasks</p>
+                <p className="mt-0.5 text-[11px] text-white/35">Click a member to see project stories</p>
               </div>
               <Link
                 to="/teams"
