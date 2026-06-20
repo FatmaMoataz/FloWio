@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   FaBriefcase,
@@ -47,21 +46,20 @@ const links = [
 
 export default function Sidebar({ onNavigate, variant = "desktop" }) {
   const isMobile = variant === "mobile";
-  const [hoveredLink, setHoveredLink] = useState(null);
 
   return (
     <aside
       className={`flowio-sidebar flex shrink-0 border border-white/5 bg-[#0f1437]/90 ${
         isMobile
           ? "h-full w-full flex-col gap-4 overflow-y-auto rounded-[24px] px-4 py-5"
-          : "hidden h-full flex-col items-center justify-between gap-2 overflow-visible rounded-[24px] py-4 md:flex lg:rounded-[28px] lg:py-5"
+          : "hidden h-full w-[94px] flex-col items-center justify-between gap-2 overflow-visible rounded-[28px] py-5 md:flex"
       }`}
     >
       {/* LOGO */}
       <NavLink
         to="/dashboard"
         onClick={onNavigate}
-        className="w-11 h-11 rounded-[14px] overflow-hidden bg-[#05091f] border border-blue-300/20 
+        className="h-13 w-13 overflow-hidden rounded-[17px] border border-blue-300/20 bg-[#05091f]
           shadow-[0_0_18px_rgba(60,100,255,.18)] flex items-center justify-center
           lg:h-14 lg:w-14 lg:rounded-[18px]"
       >
@@ -77,7 +75,7 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
         className={`flex flex-1 ${
           isMobile
             ? "w-full flex-col gap-2"
-            : "flex-col items-center justify-center gap-7 w-full"
+            : "w-full flex-col items-center justify-center gap-7"
         }`}
       >
         {links.map((link) => (
@@ -85,8 +83,6 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
             key={link.to}
             to={link.to}
             onClick={onNavigate}
-            onMouseEnter={() => setHoveredLink(link.to)}
-            onMouseLeave={() => setHoveredLink(null)}
             className={({ isActive }) =>
               `
               relative h-11 shrink-0 rounded-[13px] flex items-center transition-all duration-300
@@ -95,7 +91,7 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
                   ? "w-full justify-start gap-3 px-4 text-sm font-semibold"
                   : "w-12 justify-center"
               }
-              text-[17px] md:h-11 md:rounded-[16px] md:text-[18px] lg:h-12 lg:text-[20px]
+              text-[17px] md:h-12 md:rounded-[16px] md:text-[20px]
               ${
                 isActive
                   ? "bg-blue-300/15 text-[#7db6ff] shadow-[0_0_20px_rgba(110,181,255,.25)] scale-105"
@@ -105,11 +101,6 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
             }
           >
             {link.icon}
-            {!isMobile && hoveredLink === link.to && (
-              <span className="absolute left-full ml-2 px-3 py-1 bg-[#0f1437] text-white text-sm font-semibold whitespace-nowrap rounded-lg border border-blue-300/20 shadow-lg z-50">
-                {link.label}
-              </span>
-            )}
             {isMobile && <span>{link.label}</span>}
           </NavLink>
         ))}
@@ -119,8 +110,6 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
       <NavLink
         to="/settings"
         onClick={onNavigate}
-        onMouseEnter={() => setHoveredLink("/settings")}
-        onMouseLeave={() => setHoveredLink(null)}
         className={({ isActive }) =>
           `
           relative h-10 shrink-0 rounded-[13px] flex items-center transition-all duration-300
@@ -129,7 +118,7 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
               ? "w-full justify-start gap-3 px-4 text-sm font-semibold"
               : "w-12 justify-center"
           }
-          text-[17px] md:h-11 md:rounded-[16px] md:text-[18px] lg:h-12 lg:text-[20px]
+          text-[17px] md:h-12 md:rounded-[16px] md:text-[20px]
           ${
             isActive
               ? "bg-blue-300/15 text-[#7db6ff] shadow-[0_0_20px_rgba(110,181,255,.25)] scale-105"
@@ -139,11 +128,6 @@ export default function Sidebar({ onNavigate, variant = "desktop" }) {
         }
       >
         <FaCog />
-        {!isMobile && hoveredLink === "/settings" && (
-          <span className="absolute left-full ml-2 px-3 py-1 bg-[#0f1437] text-white text-sm font-semibold whitespace-nowrap rounded-lg border border-blue-300/20 shadow-lg z-50">
-            Settings
-          </span>
-        )}
         {isMobile && <span>Settings</span>}
       </NavLink>
     </aside>
