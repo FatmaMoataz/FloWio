@@ -88,19 +88,7 @@ const formatRole = (role) => {
     .map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 };
 
-/** Extracts all assignee IDs from a task's assignedTo/assignee/assigned_to field */
-const extractAssigneeIds = (task) => {
-  const field = task.assignedTo ?? task.assignee ?? task.assigned_to;
-  if (!field) return [];
-  return (Array.isArray(field) ? field : [field])
-    .map((item) => {
-      if (!item) return null;
-      if (typeof item === "object") return String(item._id || item.id || "");
-      return String(item);
-    })
-    .filter(Boolean);
-};
-
+/** Extracts all assignee IDs from a story's assignee/assignedTo field */
 const extractStoryAssigneeIds = (story) => {
   const field = story.assignee ?? story.assigneeId ?? story.assignedTo ?? story.assigned_to;
   if (!field) return [];
@@ -113,14 +101,14 @@ const extractStoryAssigneeIds = (story) => {
     .filter(Boolean);
 };
 
-const normalizeStoryForDiscipline = (story, project) => ({
+const normalizeStory = (story, project) => ({
   ...story,
   title: story.title || story.name || "Untitled story",
   dueDate: story.dueDate || story.due_date || project?.endDate,
-  priority: story.priority || project?.priority,
+  priority: story.priority || project?.priority || "medium",
 });
 
-/** Returns a display label + color class for a task status */
+/** Returns a display label + color class for a story status */
 const statusBadge = (s) => {
   if (STATUS.isDone(s))       return { label: "Done",        cls: "bg-emerald-400/20 text-emerald-300" };
   if (STATUS.isInProgress(s)) return { label: "In Progress", cls: "bg-blue-400/20 text-blue-300" };
@@ -137,21 +125,21 @@ const priorityBadge = (p) => {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-/** Collapsible card showing one team member and their to-do tasks */
-function MemberTaskCard({ person }) {
+/** Collapsible card showing one team member and their to-do stories */
+function MemberStoryCard({ person }) {
   const [open, setOpen] = useState(false);
 
-  const todoTasks = (person.tasks || [])
-    .filter((t) => STATUS.isTodo(t.status))
+  const todoStories = (person.stories || [])
+    .filter((s) => STATUS.isTodo(s.status))
     .sort((a, b) => (PRIORITY_ORDER[a.priority?.toLowerCase()] ?? 99) - (PRIORITY_ORDER[b.priority?.toLowerCase()] ?? 99));
 
-  const inProgressTasks = (person.tasks || [])
-    .filter((t) => STATUS.isInProgress(t.status));
+  const inProgressStories = (person.stories || [])
+    .filter((s) => STATUS.isInProgress(s.status));
 
-  const doneTasks = (person.tasks || [])
-    .filter((t) => STATUS.isDone(t.status));
+  const doneStories = (person.stories || [])
+    .filter((s) => STATUS.isDone(s.status));
 
-  const { percent, totalTasks, doneCount } = person;
+  const { percent, totalStories, doneCount } = person;
 
   return (
     <div className="rounded-[20px] bg-[#10184c]/60 transition hover:bg-[#151f62]">
@@ -161,21 +149,17 @@ function MemberTaskCard({ person }) {
         className="flex w-full items-center gap-3 p-4 text-left"
       >
         {/* Avatar */}
-        {/* <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
-          {person.name.charAt(0)}
-        </div> */}
-        {/* Avatar */}
-{person.avatar ? (
-  <img
-    src={person.avatar}
-    alt={person.name}
-    className="h-[42px] w-[42px] shrink-0 rounded-full object-cover ring-2 ring-white/15"
-  />
-) : (
-  <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
-    {person.name.charAt(0)}
-  </div>
-)}
+        {person.avatar ? (
+          <img
+            src={person.avatar}
+            alt={person.name}
+            className="h-[42px] w-[42px] shrink-0 rounded-full object-cover ring-2 ring-white/15"
+          />
+        ) : (
+          <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#6eb5ff] to-[#5b7dff] text-[14px] font-bold uppercase text-white ring-2 ring-white/15">
+            {person.name.charAt(0)}
+          </div>
+        )}
 
         {/* Name + role */}
         <div className="min-w-0 flex-1">
@@ -185,29 +169,29 @@ function MemberTaskCard({ person }) {
 
         {/* Stats */}
         <div className="flex items-center gap-3">
-          {person.hasTasks ? (
+          {person.hasStories ? (
             <div className="text-right">
               <span className="text-[12px] font-bold text-[#78aaff]">{percent}%</span>
-              <p className="text-[9px] text-white/35">{doneCount}/{totalTasks} done</p>
+              <p className="text-[9px] text-white/35">{doneCount}/{totalStories} done</p>
             </div>
           ) : (
             <span className="text-[11px] text-white/25">No stories</span>
           )}
 
-          {/* Task count badges */}
-          {todoTasks.length > 0 && (
+          {/* Story count badges */}
+          {todoStories.length > 0 && (
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
-              {todoTasks.length} to‑do
+              {todoStories.length} to‑do
             </span>
           )}
-          {inProgressTasks.length > 0 && (
+          {inProgressStories.length > 0 && (
             <span className="rounded-full bg-blue-400/20 px-2 py-0.5 text-[10px] text-blue-300">
-              {inProgressTasks.length} active
+              {inProgressStories.length} active
             </span>
           )}
 
           {/* Chevron */}
-          {person.hasTasks ? (
+          {person.hasStories ? (
             open ? (
               <FaChevronUp className="shrink-0 text-[10px] text-white/30" />
             ) : (
@@ -225,46 +209,46 @@ function MemberTaskCard({ person }) {
         />
       </div>
 
-      {/* Expanded task list */}
-      {open && person.hasTasks && (
+      {/* Expanded story list */}
+      {open && person.hasStories && (
         <div className="border-t border-white/5 px-4 pb-4 pt-3">
           {/* To-Do section */}
-          {todoTasks.length > 0 && (
+          {todoStories.length > 0 && (
             <div className="mb-3">
               <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/30">
                 <FaCircle className="text-[7px] text-white/20" /> To Do
               </p>
               <div className="space-y-1.5">
-                {todoTasks.map((task) => (
-                  <TaskRow key={task._id || task.id} task={task} />
+                {todoStories.map((story) => (
+                  <StoryRow key={story._id || story.id} story={story} />
                 ))}
               </div>
             </div>
           )}
 
           {/* In Progress section */}
-          {inProgressTasks.length > 0 && (
+          {inProgressStories.length > 0 && (
             <div className="mb-3">
               <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-400/60">
                 <FaClock className="text-[7px]" /> In Progress
               </p>
               <div className="space-y-1.5">
-                {inProgressTasks.map((task) => (
-                  <TaskRow key={task._id || task.id} task={task} />
+                {inProgressStories.map((story) => (
+                  <StoryRow key={story._id || story.id} story={story} />
                 ))}
               </div>
             </div>
           )}
 
           {/* Done section (collapsed summary) */}
-          {doneTasks.length > 0 && (
+          {doneStories.length > 0 && (
             <p className="text-[10px] text-white/25">
-              + {doneTasks.length} completed stor{doneTasks.length > 1 ? "ies" : "y"}
+              + {doneStories.length} completed stor{doneStories.length > 1 ? "ies" : "y"}
             </p>
           )}
 
           {/* No to-do or in-progress */}
-          {todoTasks.length === 0 && inProgressTasks.length === 0 && (
+          {todoStories.length === 0 && inProgressStories.length === 0 && (
             <p className="text-[11px] text-white/30">All stories completed</p>
           )}
         </div>
@@ -273,20 +257,20 @@ function MemberTaskCard({ person }) {
   );
 }
 
-/** Single task row inside the expanded member card */
-function TaskRow({ task }) {
-  const sb = statusBadge(task.status);
-  const pb = priorityBadge(task.priority);
+/** Single story row inside the expanded member card */
+function StoryRow({ story }) {
+  const sb = statusBadge(story.status);
+  const pb = priorityBadge(story.priority);
 
   return (
     <div className="flex items-center gap-2 rounded-[10px] bg-white/5 px-3 py-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-[12px] font-medium text-white/85">
-          {task.title || "Untitled story"}
+          {story.title || "Untitled story"}
         </p>
-        {task.dueDate && (
+        {story.dueDate && (
           <p className="text-[10px] text-white/30">
-            Due {new Date(task.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}
+            Due {new Date(story.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}
           </p>
         )}
       </div>
@@ -309,11 +293,11 @@ export default function Dashboard() {
   const [loadingProjects,       setLoadingProjects]       = useState(true);
   const [teamStats,             setTeamStats]             = useState({ total: 0, membersCount: 0 });
   const [loadingTeams,          setLoadingTeams]          = useState(true);
-  const [taskStats,             setTaskStats]             = useState({ total: 0, pending: 0 });
-  const [loadingTasks,          setLoadingTasks]          = useState(true);
+  const [storyStats,            setStoryStats]            = useState({ total: 0, pending: 0 });
+  const [loadingStories,        setLoadingStories]        = useState(true);
   const [meetingStats,          setMeetingStats]          = useState({ total: 0, today: 0 });
   const [loadingMeetings,       setLoadingMeetings]       = useState(true);
-  const [taskBarData,           setTaskBarData]           = useState([["Task 1",0],["Task 2",0],["Task 3",0],["Task 4",0]]);
+  const [storyBarData,          setStoryBarData]          = useState([["Story 1",0],["Story 2",0],["Story 3",0],["Story 4",0]]);
   const [projectProgressStats,  setProjectProgressStats]  = useState({ donePercent: 0, inProgressPercent: 0, toDoPercent: 100 });
   const [teamDiscipline,        setTeamDiscipline]        = useState([]);
   const [loadingDiscipline,     setLoadingDiscipline]     = useState(true);
@@ -342,11 +326,12 @@ export default function Dashboard() {
           "Authorization": `Bearer ${token}`,
         };
 
-        // ── 1. Projects ──────────────────────────────────────────────────────
+        // ── 1. Projects & Stories ────────────────────────────────────────────
         let fetchedProjects = [];
-        let allProjectStories = [];
+        let allStories = [];
         if (companyId) {
           setLoadingProjects(true);
+          setLoadingStories(true);
           try {
             const r = await fetch(
               `https://flowio-backend.vercel.app/api/projects/company/${companyId}`,
@@ -356,22 +341,26 @@ export default function Dashboard() {
               const d = await r.json();
               fetchedProjects = d.data || (Array.isArray(d) ? d : d.projects || []);
 
+              // Fetch stories for each project
               fetchedProjects = await Promise.all(
                 fetchedProjects.map(async (project) => {
                   try {
                     const storiesRes = await storyService.getStoriesByProject(project._id || project.id);
                     const stories = storiesRes?.data || storiesRes || [];
                     const projectStories = Array.isArray(stories) ? stories : [];
-                    allProjectStories = [
-                      ...allProjectStories,
-                      ...projectStories.map((story) => normalizeStoryForDiscipline(story, project)),
-                    ];
+                    
+                    // Normalize stories and add to global collection
+                    const normalizedStories = projectStories.map((story) => 
+                      normalizeStory(story, project)
+                    );
+                    allStories = [...allStories, ...normalizedStories];
+                    
                     return {
                       ...project,
                       progress: calculateProjectProgress(project, projectStories),
                     };
                   } catch (err) {
-                    console.error(`Stories fetch error for dashboard project ${project._id || project.id}:`, err);
+                    console.error(`Stories fetch error for project ${project._id || project.id}:`, err);
                     return {
                       ...project,
                       progress: Number.isFinite(Number(project.progress))
@@ -382,9 +371,13 @@ export default function Dashboard() {
                 })
               );
 
-              const active = fetchedProjects.filter((p) => getProjectDisplayStatus(p) === "in-progress" || getProjectDisplayStatus(p) === "todo").length;
+              // Calculate project stats
+              const active = fetchedProjects.filter((p) => 
+                getProjectDisplayStatus(p) === "in-progress" || getProjectDisplayStatus(p) === "todo"
+              ).length;
               const chartProjects = fetchedProjects.filter((p) => getProjectDisplayStatus(p) !== "archived");
               const totalChartProjects = chartProjects.length;
+              
               if (totalChartProjects > 0) {
                 const done = chartProjects.filter((p) => getProjectDisplayStatus(p) === "completed").length;
                 const inProgress = chartProjects.filter((p) => getProjectDisplayStatus(p) === "in-progress").length;
@@ -399,9 +392,28 @@ export default function Dashboard() {
               }
 
               setProjectStats({ total: fetchedProjects.length, active });
+
+              // Calculate story stats
+              const totalStories = allStories.length;
+              const pendingStories = allStories.filter((s) => !STATUS.isDone(s.status)).length;
+              setStoryStats({ total: totalStories, pending: pendingStories });
+
+              // Bar chart (first 4 stories)
+              const chart = allStories.slice(0, 4).map((s) => {
+                const label = (s.title || "Story").length > 8
+                  ? s.title.substring(0, 8) + ".."
+                  : s.title;
+                return [label, statusToProgress(s.status)];
+              });
+              while (chart.length < 4) chart.push([`Story ${chart.length + 1}`, 0]);
+              setStoryBarData(chart);
             }
-          } catch (e) { console.error("Projects fetch error:", e); }
-          finally { setLoadingProjects(false); }
+          } catch (e) { 
+            console.error("Projects fetch error:", e); 
+          } finally { 
+            setLoadingProjects(false);
+            setLoadingStories(false);
+          }
         }
 
         // ── 2. Meetings ──────────────────────────────────────────────────────
@@ -429,88 +441,16 @@ export default function Dashboard() {
               total: allMeetings.length,
               today: allMeetings.filter((m) => m.date?.startsWith(todayStr)).length,
             });
-          } catch (e) { console.error("Meetings fetch error:", e); }
-          finally { setLoadingMeetings(false); }
+          } catch (e) { 
+            console.error("Meetings fetch error:", e); 
+          } finally { 
+            setLoadingMeetings(false); 
+          }
         } else {
           setLoadingMeetings(false);
         }
 
-        // ── 3. Tasks (global stats + chart) ─────────────────────────────────
-        //
-        // We collect ALL tasks from every project in one deduplicated array.
-        // This same array is later used to match assignee IDs against personMap.
-        //
-        setLoadingTasks(true);
-        let allTasks = [];
-        try {
-          // My tasks first (always available)
-          const myResp = await API.get("/api/tasks/my-tasks");
-          const myTasks = myResp.data?.data || [];
-
-          // Project-level tasks
-          let projectTasks = [];
-          if (companyId && fetchedProjects.length > 0) {
-            await Promise.all(
-              fetchedProjects.map(async (project) => {
-                const pId = project._id || project.id;
-                try {
-                  const r = await fetch(
-                    `https://flowio-backend.vercel.app/api/projects/${pId}/tasks`,
-                    { method: "GET", headers }
-                  );
-                  if (r.ok) {
-                    const d = await r.json();
-                    projectTasks = [...projectTasks, ...(d.data || [])];
-                  }
-                } catch (e) { /* silent */ }
-              })
-            );
-          }
-
-          // Deduplicate by _id / id
-          const seen = new Set();
-          allTasks = [...myTasks, ...projectTasks].filter((t) => {
-            const id = t._id || t.id;
-            if (seen.has(id)) return false;
-            seen.add(id);
-            return true;
-          });
-
-          // KPI
-          const total   = allTasks.length;
-          const pending = allTasks.filter((t) => !STATUS.isDone(t.status)).length;
-          setTaskStats({ total, pending });
-
-          // Bar chart (first 4 tasks)
-          const chart = allTasks.slice(0, 4).map((t) => {
-            const label = (t.title || "Task").length > 8
-              ? t.title.substring(0, 8) + ".."
-              : t.title;
-            return [label, statusToProgress(t.status)];
-          });
-          while (chart.length < 4) chart.push([`Task ${chart.length + 1}`, 0]);
-          setTaskBarData(chart);
-
-        } catch (e) {
-          console.error("Tasks fetch error:", e);
-          setTaskStats({ total: 0, pending: 0 });
-        } finally {
-          setLoadingTasks(false);
-        }
-
-        // ── 4. Teams + per-member task discipline ────────────────────────────
-        //
-        // Strategy:
-        //   a) Fetch all teams → collect unique members into personMap
-        //      (keyed by userId string)
-        //   b) For each task in allTasks, call extractAssigneeIds() which
-        //      handles both populated objects { _id, name, ... } and raw strings.
-        //      Match those IDs against personMap and bucket the task onto the person.
-        //   c) Build the discipline list from personMap.
-        //
-        // We do NOT rely on a /api/tasks/user/:id endpoint because that route
-        // does not exist in the current backend.
-        //
+        // ── 3. Teams + per-member story discipline ───────────────────────────
         if (companyId) {
           setLoadingTeams(true);
           setLoadingDiscipline(true);
@@ -519,11 +459,11 @@ export default function Dashboard() {
             const fetchedTeams = teamsResp.data?.data ||
               (Array.isArray(teamsResp.data) ? teamsResp.data : []);
 
-            // personMap: userId (string) → { id, name, role, tasks[] }
+            // personMap: userId (string) → { id, name, role, stories[] }
             const personMap = new Map();
 
             if (fetchedTeams.length > 0) {
-              // a) Collect members
+              // a) Collect members from all teams
               await Promise.all(
                 fetchedTeams.map(async (team) => {
                   const teamId = team._id || team.id;
@@ -533,7 +473,6 @@ export default function Dashboard() {
                     const members = r.data?.data || (Array.isArray(r.data) ? r.data : []);
 
                     members.forEach((member) => {
-                      // teamMember.service populates userId with { name, email, specialization }
                       let userId   = null;
                       let userName = "Unknown";
                       let userRole = "Team Member";
@@ -542,13 +481,11 @@ export default function Dashboard() {
                       if (member.userId && typeof member.userId === "object") {
                         userId   = String(member.userId._id || member.userId.id || "");
                         userName = member.userId.name || "Unknown";
-                        // specialization > role_in_team > role
                         userRole = member.userId.specialization ||
                                    member.role_in_team ||
                                    member.userId.role ||
                                    "Team Member";
                         userAvatar = member.userId.avatar || null;
-
                       } else if (member.userId) {
                         userId = String(member.userId);
                       } else if (member._id || member.id) {
@@ -560,14 +497,24 @@ export default function Dashboard() {
                       if (!userId) return;
 
                       if (!personMap.has(userId)) {
-                        personMap.set(userId, { id: userId, name: userName, role: userRole, tasks: [], avatar: userAvatar });
+                        personMap.set(userId, { 
+                          id: userId, 
+                          name: userName, 
+                          role: userRole, 
+                          stories: [], 
+                          avatar: userAvatar 
+                        });
                       } else {
                         // Enrich existing entry if we now have better data
                         const existing = personMap.get(userId);
-                        if (existing.name === "Unknown" && userName !== "Unknown") existing.name = userName;
+                        if (existing.name === "Unknown" && userName !== "Unknown") 
+                          existing.name = userName;
                         if ((existing.role === "Team Member" || existing.role === "member") &&
                             userRole && userRole !== "Team Member") {
                           existing.role = userRole;
+                        }
+                        if (!existing.avatar && userAvatar) {
+                          existing.avatar = userAvatar;
                         }
                       }
                     });
@@ -579,15 +526,12 @@ export default function Dashboard() {
 
               setTeamStats({ total: fetchedTeams.length, membersCount: personMap.size });
 
-              // b) Distribute tasks to their assignees
-              //    extractAssigneeIds handles both { _id } objects and raw ID strings
-              allProjectStories.forEach((story) => {
+              // b) Distribute stories to their assignees
+              allStories.forEach((story) => {
                 const ids = extractStoryAssigneeIds(story);
                 ids.forEach((id) => {
-                  // Some tasks may be assigned to users not on any team we fetched —
-                  // we still track them so their to-do list is correct.
+                  // Create person entry if they don't exist in our teams
                   if (!personMap.has(id)) {
-                    // Try to pull name/role from the populated assignedTo field
                     const field = story.assignee ?? story.assigneeId ?? story.assignedTo ?? story.assigned_to;
                     const items = Array.isArray(field) ? field : [field];
                     const match = items.find(
@@ -598,44 +542,43 @@ export default function Dashboard() {
                       id,
                       name: match?.name || "Unknown",
                       role: match?.specialization || match?.role || "Team Member",
-                      tasks: [],
+                      stories: [],
+                      avatar: match?.avatar || null,
                     });
                   }
-                  personMap.get(id).tasks.push(story);
+                  personMap.get(id).stories.push(story);
                 });
               });
 
               // c) Build discipline list
               const disciplineList = Array.from(personMap.values())
                 .map((person) => {
-                  const total     = person.tasks.length;
-                  const doneCount = person.tasks.filter((t) => STATUS.isDone(t.status)).length;
+                  const total     = person.stories.length;
+                  const doneCount = person.stories.filter((s) => STATUS.isDone(s.status)).length;
                   const percent   = total > 0 ? Math.round((doneCount / total) * 100) : 0;
                   return {
-                    id:        person.id,
-                    name:      capitalizeWords(person.name),
-                    role:      formatRole(person.role),
+                    id:           person.id,
+                    name:         capitalizeWords(person.name),
+                    role:         formatRole(person.role),
                     percent,
-                    totalTasks: total,
+                    totalStories: total,
                     doneCount,
-                    hasTasks:  total > 0,
-                    tasks:     person.tasks, // full task objects for the to-do list
-                    avatar:    person.avatar || null,
+                    hasStories:   total > 0,
+                    stories:      person.stories,
+                    avatar:       person.avatar || null,
                   };
                 })
                 .sort((a, b) => {
-                  if (a.hasTasks !== b.hasTasks) return b.hasTasks - a.hasTasks;
-                  if (a.percent  !== b.percent)  return b.percent  - a.percent;
+                  if (a.hasStories !== b.hasStories) return b.hasStories - a.hasStories;
+                  if (a.percent    !== b.percent)    return b.percent    - a.percent;
                   return a.name.localeCompare(b.name);
                 });
 
               setTeamDiscipline(disciplineList);
-
             } else {
               setTeamStats({ total: 0, membersCount: 0 });
               setTeamDiscipline([]);
             }
-
           } catch (e) {
             console.error("Teams fetch error:", e);
           } finally {
@@ -646,7 +589,7 @@ export default function Dashboard() {
           setLoadingDiscipline(false);
         }
 
-        // ── 5. Notifications ─────────────────────────────────────────────────
+        // ── 4. Notifications ─────────────────────────────────────────────────
         if (realUserId) {
           setLoadingNotif(true);
           try {
@@ -686,7 +629,7 @@ export default function Dashboard() {
         setLoadingNotif(false);
         setLoadingProjects(false);
         setLoadingTeams(false);
-        setLoadingTasks(false);
+        setLoadingStories(false);
         setLoadingMeetings(false);
         setLoadingDiscipline(false);
       }
@@ -701,7 +644,7 @@ export default function Dashboard() {
 
   const kpiItems = [
     { icon: <FaProjectDiagram />, label: "Projects",     value: loadingProjects ? "…" : String(projectStats.total),    sub: `${projectStats.active} active` },
-    { icon: <FaTasks />,          label: "Tasks",        value: loadingTasks    ? "…" : String(taskStats.total),       sub: `${taskStats.pending} pending` },
+    { icon: <FaTasks />,          label: "Tasks",        value: loadingStories  ? "…" : String(storyStats.total),      sub: `${storyStats.pending} pending` },
     { icon: <FaCalendarAlt />,    label: "Meetings",     value: loadingMeetings ? "…" : String(meetingStats.total),    sub: `${meetingStats.today} today` },
     { icon: <FaUsers />,          label: "Team Members", value: loadingTeams    ? "…" : String(teamStats.membersCount),sub: `${teamStats.total} teams` },
   ];
@@ -795,7 +738,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TASKS BAR CHART */}
+          {/* STORIES BAR CHART (kept as "Tasks Progress" label) */}
           <div className={cardClass}>
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-[17px] font-bold">Tasks Progress</h3>
@@ -807,7 +750,7 @@ export default function Dashboard() {
                 <div key={top} style={{ top }} className="absolute left-0 right-0 h-px bg-white/10" />
               ))}
               <div className="absolute inset-0 flex items-end justify-around pb-6">
-                {taskBarData.map(([name, value]) => (
+                {storyBarData.map(([name, value]) => (
                   <div key={name} className="flex min-w-0 flex-col items-center">
                     <div className="relative flex h-[clamp(98px,13vh,135px)] w-[clamp(30px,3.4vw,38px)] items-end rounded-[14px] bg-white/10 p-[4px]">
                       <div
@@ -823,12 +766,12 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TEAM DISCIPLINE — collapsible per-member to-do lists */}
+          {/* TEAM DISCIPLINE — collapsible per-member story lists */}
           <div className={`${cardClass} flex flex-col`}>
             <div className="mb-5 flex shrink-0 items-center justify-between">
               <div>
                 <h3 className="text-[17px] font-bold">Team Discipline</h3>
-                <p className="mt-0.5 text-[11px] text-white/35">Click a member to see project stories</p>
+                <p className="mt-0.5 text-[11px] text-white/35">Click a member to see their stories</p>
               </div>
               <Link
                 to="/teams"
@@ -845,7 +788,7 @@ export default function Dashboard() {
                 <div className="py-8 text-center text-xs text-white/25">No team members found.</div>
               ) : (
                 teamDiscipline.map((person, idx) => (
-                  <MemberTaskCard key={`${person.id || person.name}-${idx}`} person={person} />
+                  <MemberStoryCard key={`${person.id || person.name}-${idx}`} person={person} />
                 ))
               )}
             </div>
