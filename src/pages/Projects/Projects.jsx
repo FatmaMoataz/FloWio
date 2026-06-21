@@ -240,7 +240,7 @@ function ProjectMenu({ project, onClose, onArchive, onDelete }) {
     <div ref={menuRef} onClick={(e) => e.stopPropagation()} className="flowio-project-menu absolute right-0 top-8 z-30 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#0f1535] p-1.5 shadow-2xl">
       {[
         { label: "View kanban", icon: FaColumns, onClick: () => { onClose(); navigate(`/projects/${project._id}/kanban`); } },
-        { label: "View details", icon: FaEye, onClick: () => { onClose(); navigate(`/projects/${project._id}`); } },
+        { label: "View details", icon: FaEye, onClick: () => { onClose(); navigate(`/projects/${project._id}/details`); } },
         ...(!isArchived
           ? [{ label: "Archive", icon: FaArchive, onClick: () => { onClose(); onArchive(); } }]
           : []),
@@ -526,7 +526,7 @@ export default function Projects() {
           {visibleProjects.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {visibleProjects.map((project, index) => (
-                <ProjectCard key={project._id} project={project} index={index} companyId={companyId} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} onArchive={handleArchiveProject} onDelete={(p) => setDeleteTarget(p)} onClick={(id) => navigate(`/projects/${id}`)} />
+                <ProjectCard key={project._id} project={project} index={index} companyId={companyId} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} onArchive={handleArchiveProject} onDelete={(p) => setDeleteTarget(p)} onClick={(id) => navigate(`/projects/${id}/details`)} />
               ))}
             </div>
           ) : (

@@ -39,6 +39,9 @@ const formatDate = (date) => {
 
 const normalizeStatus = (status) => STATUS_MAP[status] || STATUS_MAP[status?.toLowerCase()] || "To Do";
 
+const formatTaskDescription = (description = "") =>
+  description.replace(/^Story in epic:\s*/i, "Task: ");
+
 function SubtaskItem({ subtask, onUpdate }) {
   const [toggling, setToggling] = useState(false);
   const handleToggle = async (e) => {
@@ -122,7 +125,7 @@ function SubtaskList({ storyId, companyId }) {
   );
 }
 
-function StoryCard({ story, onStatusChange, onDelete, companyId }) {
+function StoryCard({ story, onStatusChange, onDelete, companyId, onDragStart }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [showSubtasks, setShowSubtasks] = useState(false);
@@ -131,14 +134,18 @@ function StoryCard({ story, onStatusChange, onDelete, companyId }) {
   const priorityKey = Object.keys(priorityStyles).find(k => k.toLowerCase() === priority.toLowerCase()) || "Medium";
 
   return (
-    <article className="group relative overflow-visible rounded-[24px] border border-blue-300/10 bg-[#0b1246]/90 p-4 shadow-[0_18px_40px_rgba(0,0,0,.22)] transition hover:bg-[#10195a] hover:shadow-[0_20px_50px_rgba(110,181,255,.18)]">
+    <article
+      draggable
+      onDragStart={(event) => onDragStart(event, story._id)}
+      className="group relative cursor-grab overflow-visible rounded-[24px] border border-blue-300/10 bg-[#0b1246]/90 p-4 shadow-[0_18px_40px_rgba(0,0,0,.22)] transition active:cursor-grabbing hover:bg-[#10195a] hover:shadow-[0_20px_50px_rgba(110,181,255,.18)]"
+    >
       <div className="mb-3 flex items-start justify-between gap-3">
         <h3 className="line-clamp-2 text-[13px] font-bold">{story.title}</h3>
         <button type="button" onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }} className="flex h-7 w-7 items-center justify-center rounded-full text-white/40 transition hover:bg-white/10 hover:text-white"><FaEllipsisH /></button>
         {menuOpen && (
           <div className="absolute right-3 top-10 z-[99999] w-44 overflow-hidden rounded-2xl border border-[#3148b8] bg-[#192672] p-2 shadow-[0_25px_60px_rgba(0,0,0,.85)]" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => { setMenuOpen(false); setShowSubtasks(!showSubtasks); }} className="flex h-10 w-full items-center gap-3 rounded-[13px] px-3 text-xs font-bold text-white/75 transition hover:bg-[#24358f] hover:text-white"><FaListUl className="text-[#78aaff]" />{showSubtasks ? "Hide Subtasks" : "Show Subtasks"}</button>
-            <button type="button" onClick={() => { setMenuOpen(false); onDelete(story._id); }} className="flex h-10 w-full items-center gap-3 rounded-[13px] px-3 text-xs font-bold text-[#ff6b8a] transition hover:bg-red-400/10"><FaTrash />Delete Story</button>
+            <button type="button" onClick={() => { setMenuOpen(false); onDelete(story._id); }} className="flex h-10 w-full items-center gap-3 rounded-[13px] px-3 text-xs font-bold text-[#ff6b8a] transition hover:bg-red-400/10"><FaTrash />Delete Task</button>
           </div>
         )}
       </div>
@@ -150,7 +157,7 @@ function StoryCard({ story, onStatusChange, onDelete, companyId }) {
       )}
 
       {story.description && (
-        <p className="mb-4 text-[10px] leading-5 text-white/45"><span className="block text-white/65">Description:</span>{story.description}</p>
+        <p className="mb-4 text-[10px] leading-5 text-white/45"><span className="block text-white/65">Description:</span>{formatTaskDescription(story.description)}</p>
       )}
 
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -190,12 +197,12 @@ function DeleteConfirmModal({ storyTitle, onCancel, onConfirm, isDeleting }) {
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
       <div className="w-full max-w-[420px] rounded-[28px] border border-red-300/10 bg-gradient-to-br from-[#151e66] to-[#070d35] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,.65)]">
         <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-400/15 text-red-300"><FaTrash /></div>
-        <h3 className="text-xl font-extrabold">Delete Story?</h3>
+        <h3 className="text-xl font-extrabold">Delete Task?</h3>
         <p className="mt-2 text-sm leading-6 text-white/50">Are you sure you want to delete "{storyTitle}"? This will also remove all its subtasks.</p>
         <div className="mt-7 flex gap-3">
           <button type="button" onClick={onCancel} disabled={isDeleting} className="h-11 flex-1 rounded-[16px] bg-white/10 text-sm font-bold text-white/70 transition hover:bg-white/15 disabled:opacity-50">Cancel</button>
           <button type="button" onClick={onConfirm} disabled={isDeleting} className="h-11 flex-1 rounded-[16px] bg-gradient-to-r from-[#ff5d73] to-[#ff7aa8] text-sm font-bold text-white shadow-[0_0_22px_rgba(255,93,115,.35)] transition hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2">
-            {isDeleting ? <><FaSpinner className="animate-spin" /> Deleting...</> : "Delete Story"}
+            {isDeleting ? <><FaSpinner className="animate-spin" /> Deleting...</> : "Delete Task"}
           </button>
         </div>
       </div>
@@ -214,6 +221,7 @@ export default function ProjectKanban() {
   const [deleteStoryId, setDeleteStoryId] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [companyId, setCompanyId] = useState(null);
+  const [dragOverStatus, setDragOverStatus] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -295,6 +303,35 @@ const handleStatusChange = async (storyId, newStatus) => {
   }
 };
 
+const handleDragStart = (event, storyId) => {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", storyId);
+};
+
+const handleDragOver = (event, status) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  setDragOverStatus(status);
+};
+
+const handleDragLeave = (event) => {
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    setDragOverStatus(null);
+  }
+};
+
+const handleDrop = (event, newStatus) => {
+  event.preventDefault();
+  setDragOverStatus(null);
+  const storyId = event.dataTransfer.getData("text/plain");
+  if (!storyId) return;
+
+  const currentStory = stories.find((story) => story._id === storyId);
+  if (!currentStory || normalizeStatus(currentStory.status) === newStatus) return;
+
+  handleStatusChange(storyId, newStatus);
+};
+
 const handleDeleteStory = async () => {
   if (!deleteStoryId) return;
   try {
@@ -335,38 +372,39 @@ const handleDeleteStory = async () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex h-11 w-full items-center gap-3 rounded-[17px] border border-blue-300/10 bg-[#141d66]/90 px-4 shadow-[0_12px_26px_rgba(0,0,0,.18)] sm:w-[285px]">
                 <FaSearch className="text-sm text-white/45" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search stories..." className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/45" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks..." className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/45" />
               </div>
-              <span className="text-xs text-white/40">{stories.length} stories</span>
+              <span className="text-xs text-white/40">{stories.length} tasks</span>
             </div>
           </div>
-          <button type="button" onClick={() => navigate(`/projects/${projectId}/stories/new`)} className="group flex h-12 w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-[#6eb5ff] via-[#7aa8ff] to-[#5b7dff] px-7 text-sm font-bold shadow-[0_0_30px_rgba(95,150,255,.35)] transition-all duration-300 hover:scale-105 sm:w-auto">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 transition-all group-hover:rotate-90"><FaPlus /></span>Add Story
-          </button>
         </div>
 
         <div className="grid min-h-max grid-cols-1 gap-5 overflow-visible md:grid-cols-2 xl:grid-cols-4">
           {COLUMNS.map((column) => {
             const columnStories = filteredStories.filter((story) => story.status === column.id);
             return (
-              <div key={column.id} className="relative flex min-h-[360px] flex-col overflow-visible rounded-[24px] border border-blue-300/10 bg-gradient-to-b from-[#151e66]/95 to-[#0a0f3d]/95 p-4 shadow-[0_24px_55px_rgba(0,0,0,.28)] xl:h-[720px] xl:rounded-[28px]">
+              <div
+                key={column.id}
+                onDragOver={(event) => handleDragOver(event, column.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(event) => handleDrop(event, column.id)}
+                className={`relative flex min-h-[360px] flex-col overflow-visible rounded-[24px] border border-blue-300/10 bg-gradient-to-b from-[#151e66]/95 to-[#0a0f3d]/95 p-4 shadow-[0_24px_55px_rgba(0,0,0,.28)] transition duration-200 xl:h-[720px] xl:rounded-[28px] ${dragOverStatus === column.id ? "border-[#78aaff]/60 from-[#1b2a7d]/95 to-[#11195a]/95 shadow-[0_24px_65px_rgba(110,181,255,.18)]" : ""}`}
+              >
                 <div className="mb-4 flex shrink-0 items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: column.color }} />
                     <h2 className="text-[13px] font-bold text-white/80">{column.title}</h2>
                     <span className="flex h-7 min-w-7 items-center justify-center rounded-[10px] bg-[#0b1246] px-2 text-xs font-bold">{columnStories.length}</span>
                   </div>
-                  <button type="button" onClick={() => navigate(`/projects/${projectId}/stories/new?status=${encodeURIComponent(column.id)}`)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/45 transition hover:bg-blue-400/15 hover:text-[#78aaff]"><FaPlus /></button>
                 </div>
                 <div className="flex-1 space-y-4 overflow-y-auto overflow-x-visible pr-2 pb-6">
-                  {columnStories.map((story) => <StoryCard key={story._id} story={story} companyId={companyId} onStatusChange={handleStatusChange} onDelete={(id) => setDeleteStoryId(id)} />)}
+                  {columnStories.map((story) => <StoryCard key={story._id} story={story} companyId={companyId} onStatusChange={handleStatusChange} onDelete={(id) => setDeleteStoryId(id)} onDragStart={handleDragStart} />)}
                   {!columnStories.length && (
-                    <button type="button" onClick={() => navigate(`/projects/${projectId}/stories/new?status=${encodeURIComponent(column.id)}`)} className="flex min-h-[130px] w-full flex-col items-center justify-center rounded-[24px] border border-dashed border-blue-300/15 bg-[#0b1246]/40 text-center text-xs text-white/35 transition hover:border-blue-300/35 hover:bg-[#111b63]/75 hover:text-white/70"><FaPlus className="mb-3 text-lg" />Add Story</button>
+                    <div className="flex min-h-[130px] w-full items-center justify-center rounded-[24px] border border-dashed border-blue-300/15 bg-[#0b1246]/40 text-center text-xs font-semibold text-white/35">
+                      No tasks yet
+                    </div>
                   )}
                 </div>
-                {columnStories.length > 0 && (
-                  <button type="button" onClick={() => navigate(`/projects/${projectId}/stories/new?status=${encodeURIComponent(column.id)}`)} className="mt-4 flex h-10 shrink-0 items-center justify-center gap-2 rounded-[18px] bg-[#0b1246]/70 text-xs font-bold text-white/70 transition hover:bg-blue-400/15 hover:text-[#78aaff]"><FaPlus />Add Story</button>
-                )}
               </div>
             );
           })}
