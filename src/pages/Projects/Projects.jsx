@@ -526,7 +526,7 @@ export default function Projects() {
           {visibleProjects.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {visibleProjects.map((project, index) => (
-                <ProjectCard key={project._id} project={project} index={index} companyId={companyId} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} onArchive={handleArchiveProject} onDelete={(p) => setDeleteTarget(p)} onClick={(id) => navigate(`/projects/${id}/details`)} />
+                <ProjectCard key={project._id} project={project} index={index} companyId={companyId} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} onArchive={handleArchiveProject} onDelete={(p) => setDeleteTarget(p)} onClick={(id) => navigate(`/projects/${id}`)} />
               ))}
             </div>
           ) : (
