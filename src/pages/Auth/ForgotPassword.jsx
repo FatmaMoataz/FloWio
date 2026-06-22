@@ -82,7 +82,7 @@ export default function ForgotPassword() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 6) { ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccg
       toast.warning("Password must be at least 6 characters");
       return;
     }
