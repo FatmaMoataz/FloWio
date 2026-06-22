@@ -14,7 +14,7 @@ import {
   FaUserCircle,
 } from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
-import { getProject } from "./projectStore";
+import projectService from "../../services/projectService";
 
 const columns = [
   { id: "todo", title: "TO-DO" },

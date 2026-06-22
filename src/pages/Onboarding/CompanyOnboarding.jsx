@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   FaArrowRight,
@@ -7,20 +7,23 @@ import {
   FaBuilding,
   FaCheck,
   FaCheckCircle,
-  FaCopy,
   FaCrown,
-  FaEnvelope,
-  FaLink,
   FaMinus,
   FaPaperPlane,
   FaPlus,
   FaRocket,
   FaShieldAlt,
+  FaSpinner,
   FaTimes,
   FaUserFriends,
 } from "react-icons/fa";
 import logo from "../../assets/logo.svg";
+import companyService from "../../services/companyService";
+import subscriptionService from "../../services/subscriptionService";
+import invitationService from "../../services/invitationService";
 
+// Plan ids now match the backend's subscriptionPlan enum exactly
+// (free | starter | pro | enterprise) — no more translation layer needed.
 const plans = [
   {
     id: "starter",
@@ -60,7 +63,7 @@ const plans = [
     monthly: null,
     icon: <FaBuilding />,
     description: "For large organizations with custom requirements.",
-    limit: 100,
+    limit: null, // unlimited — no self-serve seat selector
     features: [
       "Unlimited team members",
       "Unlimited projects",
@@ -74,28 +77,91 @@ const plans = [
 
 export default function CompanyOnboarding() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [step, setStep] = useState(2);
-  const [billing, setBilling] = useState("yearly");
+  const [billing, setBilling] = useState("monthly");
   const [selectedPlan, setSelectedPlan] = useState("pro");
   const [seats, setSeats] = useState(10);
   const [emailInput, setEmailInput] = useState("");
   const [emails, setEmails] = useState([]);
-  const [inviteRole, setInviteRole] = useState("Member");
+  const [inviteRole, setInviteRole] = useState("Member"); // UI only for now — see note below
 
-  const inviteCode = useMemo(
-    () => Math.random().toString(36).slice(2, 10),
-    [],
-  );
-  const inviteLink = `${window.location.origin}/invite/${inviteCode}`;
+  const [company, setCompany] = useState(null);
+  const [isLoadingCompany, setIsLoadingCompany] = useState(true);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isSendingInvites, setIsSendingInvites] = useState(false);
+
   const plan = plans.find((item) => item.id === selectedPlan) || plans[1];
   const billingMonths = billing === "yearly" ? 10 : 1;
-  const subtotal = plan.monthly ? plan.monthly * billingMonths : 0;
+  // FIXED: price now actually reflects seat count, matching what Stripe will
+  // charge (quantity = seats). The original version ignored seats entirely.
+  const subtotal = plan.monthly ? plan.monthly * seats * billingMonths : 0;
   const tax = subtotal * 0.1;
   const total = subtotal + tax;
 
+  // Load the real company on mount so plan/seats reflect server state
+  // instead of starting from arbitrary defaults every time.
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await companyService.getMyCompany();
+        setCompany(data);
+        if (data?.subscriptionPlan && data.subscriptionPlan !== "free") {
+          setSelectedPlan(data.subscriptionPlan);
+          // Free plan always stores seats: 1 — that's meaningless for a
+          // paid plan, so only trust the stored seat count when the
+          // company is actually on a paid plan.
+          if (data?.seats) setSeats(data.seats);
+          if (data?.billingCycle) setBilling(data.billingCycle);
+        }
+      } catch (error) {
+        toast.error(error.message || "Could not load your company.");
+      } finally {
+        setIsLoadingCompany(false);
+      }
+    })();
+  }, []);
+
+  // Handles the redirect back from Stripe Checkout:
+  //   /onboarding?step=invite&session_id=cs_test_...   (success)
+  //   /onboarding?step=plan&canceled=true               (canceled)
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    const canceled = searchParams.get("canceled");
+
+    if (canceled) {
+      toast.info("Checkout canceled — pick a plan again whenever you're ready.");
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    if (!sessionId) return;
+
+    (async () => {
+      try {
+        const updatedCompany = await subscriptionService.verifySession(sessionId);
+        setCompany(updatedCompany);
+        setSelectedPlan(updatedCompany.subscriptionPlan);
+        setSeats(updatedCompany.seats);
+        setBilling(updatedCompany.billingCycle || "monthly");
+        setStep(3);
+        toast.success("Subscription confirmed!");
+      } catch (error) {
+        toast.error(error.message || "Payment is processing — this can take a few seconds.");
+      } finally {
+        setSearchParams({}, { replace: true });
+      }
+    })();
+    // run once on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const selectPlan = (nextPlan) => {
     setSelectedPlan(nextPlan.id);
-    setSeats((current) => Math.min(current, nextPlan.limit));
+    if (nextPlan.limit) {
+      setSeats((current) => Math.min(current, nextPlan.limit));
+    }
   };
 
   const addEmail = () => {
@@ -115,42 +181,97 @@ export default function CompanyOnboarding() {
     setEmailInput("");
   };
 
-  const copyInviteLink = async () => {
+  const removeEmail = (email) => {
+    setEmails((current) => current.filter((item) => item !== email));
+  };
+
+  // Replaces the old "set step to 3" no-op with the real flow:
+  // free → confirm instantly, paid → redirect to Stripe Checkout, enterprise → email sales.
+  const goToCheckout = async (planId) => {
+    if (!company) {
+      toast.error("Your company isn't loaded yet — try again in a moment.");
+      return;
+    }
+
+    if (planId === "enterprise") {
+      window.location.href = "mailto:sales@flowio.app?subject=Enterprise%20plan";
+      return;
+    }
+
+    setIsCheckingOut(true);
     try {
-      await navigator.clipboard.writeText(inviteLink);
-      toast.success("Invitation link copied.");
-    } catch {
-      toast.error("Could not copy the invitation link.");
+      const result = await subscriptionService.startCheckout({
+        plan: planId,
+        billingCycle: billing,
+        seats: planId === "free" ? 1 : seats,
+      });
+
+      if (result.free) {
+        setCompany(result.data);
+        setStep(3);
+        toast.success("You're all set on the Free plan.");
+        return;
+      }
+
+      if (result.url) {
+        window.location.href = result.url; // leaves the app for Stripe Checkout
+      }
+    } catch (error) {
+      toast.error(error.message || "Could not start checkout.");
+    } finally {
+      setIsCheckingOut(false);
     }
   };
 
-  const sendInvites = () => {
+  // Replaces the old fake "invite link" + toast-only sendInvites with real
+  // per-email POSTs to /api/invitations.
+  const sendInvites = async () => {
     if (emails.length === 0) {
       toast.warning("Add at least one teammate email.");
       return;
     }
+    if (!company?._id) {
+      toast.error("Your company isn't loaded yet — try again in a moment.");
+      return;
+    }
 
-    toast.success(`${emails.length} invitation${emails.length > 1 ? "s" : ""} ready to send.`);
+    setIsSendingInvites(true);
+    try {
+      const { succeeded, failed } = await invitationService.sendBulkInvitations(
+        emails,
+        company._id
+      );
+
+      if (succeeded.length > 0) {
+        toast.success(`${succeeded.length} invitation${succeeded.length > 1 ? "s" : ""} sent.`);
+        const sentEmails = succeeded.map((invite) => invite.emailInvited);
+        setEmails((current) => current.filter((email) => !sentEmails.includes(email)));
+      }
+
+      failed.forEach(({ email, reason }) => {
+        toast.error(`${email}: ${reason || "Could not send invitation."}`);
+      });
+    } catch (error) {
+      toast.error(error.message || "Could not send invitations.");
+    } finally {
+      setIsSendingInvites(false);
+    }
   };
 
   const enterWorkspace = () => {
-    localStorage.setItem(
-      "flowio-company-onboarding",
-      JSON.stringify({
-        completed: true,
-        plan: selectedPlan,
-        billing,
-        seats,
-        invitedEmails: emails,
-        inviteRole,
-      }),
-    );
     navigate("/dashboard");
   };
 
+  const continueLabel =
+    selectedPlan === "enterprise"
+      ? "Contact Sales"
+      : selectedPlan === "free"
+        ? "Continue with Free plan"
+        : "Continue to Checkout";
+
   return (
     <div className="flowio-auth-page min-h-screen bg-[radial-gradient(circle_at_bottom,#071c75_0%,#020617_38%,#030616_100%)] p-3 text-white sm:p-6">
-      <main className="flowio-onboarding mx-auto w-full max-w-[1420px] rounded-[24px] border border-blue-400/30 bg-[#060b24]/95 p-4 shadow-[0_0_60px_rgba(37,99,235,.28)] sm:rounded-[30px] sm:p-6 lg:p-8">
+      <main className="flowio-onboarding mx-auto w-full max-w-[1420px] rounded-[20px] border border-blue-400/30 bg-[#060b24]/95 p-3 shadow-[0_0_60px_rgba(37,99,235,.28)] sm:rounded-[30px] sm:p-6 lg:p-8">
         <header className="mb-7">
           <div className="flex items-center justify-center gap-4">
             <img
@@ -163,7 +284,7 @@ export default function CompanyOnboarding() {
             </h1>
           </div>
 
-          <div className="mx-auto mt-7 flex max-w-[600px] items-center justify-center text-xs sm:text-sm">
+          <div className="mx-auto mt-7 flex max-w-[600px] items-center justify-center text-[11px] sm:text-sm">
             {[
               [1, "Account"],
               [2, "Subscription"],
@@ -182,7 +303,7 @@ export default function CompanyOnboarding() {
                   >
                     {number < step ? <FaCheck /> : number}
                   </span>
-                  <span className={number === step ? "font-bold" : "text-white/50"}>
+                  <span className={number === step ? "hidden font-bold sm:inline" : "hidden text-white/50 sm:inline"}>
                     {label}
                   </span>
                 </div>
@@ -193,10 +314,10 @@ export default function CompanyOnboarding() {
         </header>
 
         <div className="grid gap-6 xl:grid-cols-[1.35fr_.85fr]">
-          <section className="rounded-[22px] border border-blue-300/10 bg-[#0a1033]/85 p-4 sm:p-6">
+          <section className="rounded-[20px] border border-blue-300/10 bg-[#0a1033]/85 p-3 sm:rounded-[22px] sm:p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-xl font-bold sm:text-2xl">
                   Choose your <span className="text-[#64CFFF]">subscription</span> plan
                 </h2>
                 <p className="mt-2 text-sm text-white/55">
@@ -204,7 +325,7 @@ export default function CompanyOnboarding() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-3 sm:text-sm">
                 <span className={billing === "monthly" ? "text-white" : "text-white/50"}>Monthly</span>
                 <button
                   type="button"
@@ -215,11 +336,11 @@ export default function CompanyOnboarding() {
                   <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${billing === "yearly" ? "left-6" : "left-1"}`} />
                 </button>
                 <span className={billing === "yearly" ? "text-white" : "text-white/50"}>Yearly</span>
-                <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs text-[#64CFFF]">Save 20%</span>
+                <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs text-[#64CFFF]">2 months free</span>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-3">
               {plans.map((item) => {
                 const selected = selectedPlan === item.id;
 
@@ -228,7 +349,7 @@ export default function CompanyOnboarding() {
                     key={item.id}
                     type="button"
                     onClick={() => selectPlan(item)}
-                    className={`relative flex min-h-[430px] flex-col rounded-[20px] border p-5 text-left transition ${
+                    className={`relative flex flex-col rounded-[18px] border p-4 text-left transition sm:rounded-[20px] sm:p-5 lg:min-h-[430px] ${
                       selected
                         ? "border-[#3f7cff] bg-[#111b50] shadow-[0_0_26px_rgba(63,124,255,.35)]"
                         : "border-white/10 bg-[#0d153d] hover:border-blue-300/35"
@@ -243,20 +364,24 @@ export default function CompanyOnboarding() {
                       {item.icon}
                     </span>
                     <h3 className="mt-4 text-xl font-bold">{item.name}</h3>
-                    <p className="mt-2 min-h-[48px] text-xs leading-5 text-white/55">
+                    <p className="mt-2 text-xs leading-5 text-white/55 lg:min-h-[48px]">
                       {item.description}
                     </p>
 
-                    <div className="my-5">
+                    <div className="my-4 sm:my-5">
                       {item.monthly ? (
                         <>
-                          <span className="text-4xl font-extrabold">
-                            ${billing === "yearly" ? Math.round(item.monthly * 0.8) : item.monthly}
+                          <span className="text-3xl font-extrabold sm:text-4xl">
+                            ${billing === "yearly" ? (item.monthly * 10 / 12).toFixed(2) : item.monthly}
                           </span>
-                          <span className="ml-1 text-xs text-white/55">/mo</span>
-                          <p className="mt-1 text-xs text-white/45">
-                            billed {billing}
-                          </p>
+                          <span className="ml-1 text-xs text-white/55">/seat/mo</span>
+                          {billing === "yearly" ? (
+                            <p className="mt-1 text-xs text-white/45">
+                              billed annually — ${item.monthly * 10}/seat/yr
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-xs text-white/45">billed monthly</p>
+                          )}
                         </>
                       ) : (
                         <>
@@ -275,7 +400,7 @@ export default function CompanyOnboarding() {
                       ))}
                     </div>
 
-                    <span className={`mt-auto flex h-11 items-center justify-center rounded-[14px] font-bold ${
+                    <span className={`mt-5 flex h-11 items-center justify-center rounded-[14px] font-bold lg:mt-auto ${
                       selected ? "bg-[#245df5] text-white" : "bg-[#19265f] text-white/85"
                     }`}>
                       {selected ? "Selected" : item.monthly ? `Choose ${item.name}` : "Contact Sales"}
@@ -286,32 +411,43 @@ export default function CompanyOnboarding() {
             </div>
 
             <div className="mt-5 rounded-[20px] border border-white/10 bg-[#0d153d] p-4 sm:p-5">
-              <div className="grid gap-5 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+              <div className="grid gap-5 md:grid-cols-[1fr_auto_1fr] md:items-center">
                 <div className="flex items-center gap-4">
                   <span className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-blue-400/30 bg-blue-400/10 text-xl text-[#64CFFF]">
                     {plan.icon}
                   </span>
                   <div>
                     <p className="font-bold">{plan.name} Plan</p>
-                    <p className="mt-1 text-xs text-white/50">Up to {plan.limit} team members</p>
+                    <p className="mt-1 text-xs text-white/50">
+                      {plan.limit ? `Up to ${plan.limit} team members` : "Unlimited team members"}
+                    </p>
                   </div>
                 </div>
 
-                <div>
-                  <p className="mb-2 text-xs text-white/55">Seats</p>
-                  <div className="flex h-10 items-center rounded-xl border border-white/15">
-                    <button type="button" onClick={() => setSeats((current) => Math.max(1, current - 1))} className="h-full px-4"><FaMinus /></button>
-                    <span className="min-w-10 text-center font-bold">{seats}</span>
-                    <button type="button" onClick={() => setSeats((current) => Math.min(plan.limit, current + 1))} className="h-full px-4"><FaPlus /></button>
+                {plan.monthly ? (
+                  <div>
+                    <p className="mb-2 text-xs text-white/55">Seats</p>
+                    <div className="flex h-10 w-full max-w-[180px] items-center justify-between rounded-xl border border-white/15">
+                      <button type="button" onClick={() => setSeats((current) => Math.max(1, current - 1))} className="h-full px-4"><FaMinus /></button>
+                      <span className="min-w-10 text-center font-bold">{seats}</span>
+                      <button type="button" onClick={() => setSeats((current) => Math.min(plan.limit, current + 1))} className="h-full px-4"><FaPlus /></button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div />
+                )}
 
                 <div className="space-y-2 text-sm">
                   {plan.monthly ? (
                     <>
-                      <p className="flex justify-between gap-8"><span className="text-white/55">Subtotal</span><b>${subtotal.toFixed(2)}</b></p>
-                      <p className="flex justify-between gap-8"><span className="text-white/55">Tax (10%)</span><b>${tax.toFixed(2)}</b></p>
-                      <p className="flex justify-between gap-8 border-t border-white/10 pt-2 text-base"><span>Total due today</span><b className="text-[#64CFFF]">${total.toFixed(2)}</b></p>
+                      <p className="flex justify-between gap-4"><span className="text-white/55">Subtotal ({seats} seats)</span><b>${subtotal.toFixed(2)}</b></p>
+                      <p className="flex justify-between gap-4"><span className="text-white/55">Tax (10%)</span><b>${tax.toFixed(2)}</b></p>
+                      <p className="flex justify-between gap-4 border-t border-white/10 pt-2 text-base"><span>Total due today</span><b className="text-[#64CFFF]">${total.toFixed(2)}</b></p>
+                      {billing === "yearly" && (
+                        <p className="text-right text-[11px] text-white/40">
+                          Billed once for the year — renews annually
+                        </p>
+                      )}
                     </>
                   ) : (
                     <p className="text-white/65">Our sales team will create custom pricing for your organization.</p>
@@ -321,13 +457,34 @@ export default function CompanyOnboarding() {
 
               <button
                 type="button"
-                onClick={() => setStep(3)}
-                className="mx-auto mt-5 flex h-12 w-full max-w-[360px] items-center justify-center gap-3 rounded-[14px] bg-[#245df5] font-bold text-white transition hover:bg-[#1d4ed8]"
+                onClick={() => goToCheckout(selectedPlan)}
+                disabled={isCheckingOut || isLoadingCompany}
+                className="mx-auto mt-5 flex h-12 w-full max-w-[360px] items-center justify-center gap-3 rounded-[14px] bg-[#245df5] font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Continue to Invite Team <FaArrowRight />
+                {isCheckingOut ? (
+                  <>
+                    <FaSpinner className="animate-spin" /> Redirecting to checkout...
+                  </>
+                ) : (
+                  <>
+                    {continueLabel} <FaArrowRight />
+                  </>
+                )}
               </button>
+
+              {selectedPlan !== "free" && (
+                <button
+                  type="button"
+                  onClick={() => goToCheckout("free")}
+                  disabled={isCheckingOut || isLoadingCompany}
+                  className="mx-auto mt-3 block text-center text-xs font-semibold text-white/45 underline-offset-2 hover:text-white/70 hover:underline"
+                >
+                  Skip for now — stay on the Free plan
+                </button>
+              )}
+
               <p className="mt-3 flex items-center justify-center gap-2 text-xs text-white/45">
-                <FaShieldAlt /> Secure checkout. You can review before payment.
+                <FaShieldAlt /> Payments are processed securely by Stripe.
               </p>
             </div>
           </section>
@@ -342,20 +499,10 @@ export default function CompanyOnboarding() {
               <h2 className="text-2xl font-bold">Invite Your Team</h2>
             </div>
             <p className="mt-3 text-sm leading-6 text-white/55">
-              Send invitation links so teammates can join your Flowio workspace.
+              Each teammate gets a secure, single-use invitation sent to their email.
             </p>
 
-            <label className="mt-6 block">
-              <span className="mb-2 block text-sm font-semibold">Invite link</span>
-              <div className="flex rounded-xl border border-white/15 bg-[#080d29] p-1">
-                <input value={inviteLink} readOnly className="min-w-0 flex-1 bg-transparent px-3 text-xs text-white/55 outline-none" />
-                <button type="button" onClick={copyInviteLink} className="flex shrink-0 items-center gap-2 rounded-lg bg-[#19265f] px-3 text-xs font-bold">
-                  <FaCopy /> Copy
-                </button>
-              </div>
-            </label>
-
-            <div className="mt-5">
+            <div className="mt-6">
               <span className="mb-2 block text-sm font-semibold">Invite by email</span>
               <div className="rounded-xl border border-white/15 bg-[#080d29] p-3">
                 {emails.length > 0 && (
@@ -363,7 +510,7 @@ export default function CompanyOnboarding() {
                     {emails.map((email) => (
                       <span key={email} className="flex items-center gap-2 rounded-full bg-[#1a2451] px-3 py-1.5 text-xs">
                         {email}
-                        <button type="button" onClick={() => setEmails((current) => current.filter((item) => item !== email))}>
+                        <button type="button" onClick={() => removeEmail(email)}>
                           <FaTimes />
                         </button>
                       </span>
@@ -388,6 +535,8 @@ export default function CompanyOnboarding() {
               </div>
             </div>
 
+            {/* NOTE: the invitation model/route don't currently store a role —
+                this selector is UI-only until that's added on the backend. */}
             <label className="mt-5 block">
               <span className="mb-2 block text-sm font-semibold">Role for invited members</span>
               <select
@@ -404,16 +553,18 @@ export default function CompanyOnboarding() {
             <button
               type="button"
               onClick={sendInvites}
-              className="mt-5 flex h-12 w-full items-center justify-center gap-3 rounded-[14px] bg-[#245df5] font-bold text-white"
+              disabled={isSendingInvites}
+              className="mt-5 flex h-12 w-full items-center justify-center gap-3 rounded-[14px] bg-[#245df5] font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Send Invites <FaPaperPlane />
-            </button>
-            <button
-              type="button"
-              onClick={copyInviteLink}
-              className="mt-3 flex h-11 w-full items-center justify-center gap-3 rounded-[14px] border border-white/20 font-semibold"
-            >
-              Copy Invite Link <FaLink />
+              {isSendingInvites ? (
+                <>
+                  <FaSpinner className="animate-spin" /> Sending...
+                </>
+              ) : (
+                <>
+                  Send Invites <FaPaperPlane />
+                </>
+              )}
             </button>
 
             <div className="mt-7 border-t border-white/10 pt-6">
@@ -439,7 +590,7 @@ export default function CompanyOnboarding() {
             <div className="mt-6 rounded-[16px] border border-blue-400/20 bg-blue-400/5 p-4">
               <p className="flex gap-3 text-xs leading-5 text-white/60">
                 <FaShieldAlt className="mt-1 shrink-0 text-[#64CFFF]" />
-                Invited members receive a secure link. You can manage roles and permissions from workspace settings.
+                Invited members receive a secure link by email. You can manage roles and permissions from workspace settings.
               </p>
             </div>
 

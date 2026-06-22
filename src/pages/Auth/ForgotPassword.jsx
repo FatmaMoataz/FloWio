@@ -4,12 +4,13 @@ import { toast } from "react-toastify";
 import {
   FaArrowLeft,
   FaEnvelope,
-  FaKey,
   FaShieldAlt,
+  FaKey,
   FaCheck,
 } from "react-icons/fa";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 import logo from "../../assets/logo.svg";
+import authService from "../../services/authService";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -20,8 +21,7 @@ export default function ForgotPassword() {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [generatedCode, setGeneratedCode] = useState("");
+  const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -30,11 +30,12 @@ export default function ForgotPassword() {
     [email],
   );
 
-  const sendCode = (e) => {
+  // Step 1: request an OTP by email
+  const sendCode = async (e) => {
     e?.preventDefault();
 
     if (!email) {
-      toast.warning("Please enter your Gmail");
+      toast.warning("Please enter your email");
       return;
     }
 
@@ -45,36 +46,46 @@ export default function ForgotPassword() {
 
     setLoading(true);
 
-    setTimeout(() => {
-      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-      setGeneratedCode(newCode);
+    try {
+      const res = await authService.forgotPassword(email);
       setStep(2);
+      toast.success(res.message || "Verification code sent! Check your inbox.");
+    } catch (err) {
+      toast.error(err.message || "Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
-
-      toast.success(`Verification code sent! Demo code: ${newCode}`);
-      console.log("Flowio reset password code:", newCode);
-    }, 700);
+    }
   };
 
-  const verifyCode = (e) => {
+  // Step 2: verify the OTP the user received by email
+  const verifyCode = async (e) => {
     e.preventDefault();
 
-    if (!code) {
-      toast.warning("Please enter verification code");
+    if (!otp) {
+      toast.warning("Please enter the verification code");
       return;
     }
 
-    if (code !== generatedCode) {
-      toast.error("Invalid verification code");
+    if (otp.length !== 6) {
+      toast.warning("The code must be 6 digits");
       return;
     }
 
-    toast.success("Code verified successfully");
-    setStep(3);
+    setLoading(true);
+
+    try {
+      await authService.verifyOtp(email, otp);
+      toast.success("Code verified successfully");
+      setStep(3);
+    } catch (err) {
+      toast.error(err.message || "Invalid or expired code");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const resetPassword = (e) => {
+  // Step 3: set the new password (otp is re-checked server-side here too)
+  const resetPassword = async (e) => {
     e.preventDefault();
 
     if (!password || !confirmPassword) {
@@ -92,11 +103,27 @@ export default function ForgotPassword() {
       return;
     }
 
-    toast.success("Password reset successfully!");
+    setLoading(true);
 
-    setTimeout(() => {
-      navigate("/login");
-    }, 1000);
+    try {
+      const res = await authService.resetPassword(email, otp, password);
+
+      if (res.data?.accessToken) {
+        localStorage.setItem("token", res.data.accessToken);
+        localStorage.setItem("refreshToken", res.data.refreshToken);
+        localStorage.setItem("userId", res.data.user._id);
+      }
+
+      toast.success("Password reset successfully!");
+
+      setTimeout(() => {
+        navigate("/login");
+      }, 1000);
+    } catch (err) {
+      toast.error(err.message || "Could not reset password. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -130,7 +157,7 @@ export default function ForgotPassword() {
 
         <p className="mb-6 text-center text-sm text-white/60">
           {step === 1 &&
-            "Enter your Gmail and we will send you a verification code."}
+            "Enter your email and we will send you a verification code."}
           {step === 2 && `We sent a 6-digit code to ${email}`}
           {step === 3 && "Create a new secure password for your account."}
         </p>
@@ -153,7 +180,7 @@ export default function ForgotPassword() {
               type="email"
               value={email}
               onChange={setEmail}
-              placeholder="Enter your Gmail"
+              placeholder="Enter your email"
               disabled={loading}
             />
 
@@ -171,17 +198,19 @@ export default function ForgotPassword() {
           <form onSubmit={verifyCode} className="space-y-4">
             <AuthInput
               icon={<FaShieldAlt />}
-              value={code}
-              onChange={(value) => setCode(value.replace(/\D/g, ""))}
+              value={otp}
+              onChange={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))}
               placeholder="Enter 6-digit code"
               maxLength={6}
+              disabled={loading}
             />
 
             <button
               type="submit"
-              className="h-12 w-full rounded-2xl bg-[#5089D6] font-bold transition hover:brightness-110"
+              disabled={loading}
+              className="h-12 w-full rounded-2xl bg-[#5089D6] font-bold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Verify Code
+              {loading ? "Verifying..." : "Verify Code"}
             </button>
 
             <button
@@ -203,6 +232,7 @@ export default function ForgotPassword() {
               value={password}
               onChange={setPassword}
               placeholder="New Password"
+              disabled={loading}
               rightIcon={
                 <button
                   type="button"
@@ -220,6 +250,7 @@ export default function ForgotPassword() {
               value={confirmPassword}
               onChange={setConfirmPassword}
               placeholder="Confirm Password"
+              disabled={loading}
               rightIcon={
                 <button
                   type="button"
@@ -233,9 +264,10 @@ export default function ForgotPassword() {
 
             <button
               type="submit"
-              className="h-12 w-full rounded-2xl bg-[#5089D6] font-bold transition hover:brightness-110"
+              disabled={loading}
+              className="h-12 w-full rounded-2xl bg-[#5089D6] font-bold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Reset Password
+              {loading ? "Resetting..." : "Reset Password"}
             </button>
           </form>
         )}

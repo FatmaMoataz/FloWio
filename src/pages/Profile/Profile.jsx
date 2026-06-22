@@ -4,6 +4,9 @@ import MainLayout from "../../layout/MainLayout";
 import { jwtDecode } from "jwt-decode"; 
 import userService from "../../services/userService";
 import API from "../../services/api";
+import projectService from "../../services/projectService";
+import storyService from "../../services/storyService";
+import taskService from "../../services/taskService";
 
 import {
   FaLaptopCode,
@@ -34,6 +37,7 @@ export default function Profile() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [taskCount, setTaskCount] = useState(0);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [taskProgress, setTaskProgress] = useState(0); // % of tasks completed
   
   // New state for teams
   const [teams, setTeams] = useState([]);
@@ -51,6 +55,35 @@ export default function Profile() {
       return { icon: <FaLaptopCode />, color: "from-[#8f7cff] to-[#5b7dff]" };
     }
     return { icon: <FaProjectDiagram />, color: "from-[#5fffd0] to-[#35b7ff]" };
+  };
+
+  const getEntityId = (entity) => {
+    if (!entity) return "";
+    if (typeof entity === "string") return entity;
+    return String(entity._id || entity.id || "");
+  };
+
+  const getStoryAssigneeId = (story) => (
+    getEntityId(story.assignee) ||
+    getEntityId(story.assigneeId) ||
+    getEntityId(story.assignedTo) ||
+    getEntityId(story.userId)
+  );
+
+  const isDoneStory = (story) => {
+    const status = String(story?.status || "").toLowerCase();
+    return status === "done" || status === "completed";
+  };
+
+  const calculateProjectProgress = (project, stories = []) => {
+    if (!stories.length) return project.status === "completed" ? 100 : 0;
+    return Math.round((stories.filter(isDoneStory).length / stories.length) * 100);
+  };
+
+  const getProjectStatusLabel = (project, progress) => {
+    if (progress >= 100 || project.status === "completed") return "Completed";
+    if (project.status === "archived" || project.isArchived) return "Archived";
+    return "Active";
   };
 
   // Fetch user's teams
@@ -128,57 +161,114 @@ export default function Profile() {
 
         fetchUserProfile();
 
-        const fetchProfileProjects = async () => {
+        const fetchProfileProjects = async (currentUserId) => {
           try {
-            const response = await fetch(`https://flowio-backend.vercel.app/api/projects/company/${companyId}`, {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                "x-auth-token": token,
-                "Authorization": `Bearer ${token}`
-              },
-            });
-            if (response.ok) {
-              const resData = await response.json();
-              const fetched = resData.data || (Array.isArray(resData) ? resData : resData.projects || []);
-              setRealProjects(fetched.slice(0, 2));
+            if (!companyId || !currentUserId) {
+              setRealProjects([]);
+              return;
             }
+
+            const response = await projectService.getProjectsByCompany(companyId);
+            const fetched = response?.data || (Array.isArray(response) ? response : response?.projects || []);
+
+            const projectsWithStories = await Promise.all(
+              fetched.map(async (project) => {
+                try {
+                  const storiesRes = await storyService.getStoriesByProject(project._id || project.id);
+                  const stories = storiesRes?.data || storiesRes || [];
+                  const projectStories = Array.isArray(stories) ? stories : [];
+
+                  return {
+                    ...project,
+                    stories: projectStories,
+                    progress: calculateProjectProgress(project, projectStories),
+                  };
+                } catch (err) {
+                  console.error(`Error fetching stories for profile project ${project._id || project.id}:`, err);
+                  return {
+                    ...project,
+                    stories: [],
+                    progress: Number.isFinite(Number(project.progress))
+                      ? Number(project.progress)
+                      : calculateProjectProgress(project),
+                  };
+                }
+              })
+            );
+
+            const assignedProjects = projectsWithStories.filter((project) =>
+              (project.stories || []).some((story) => getStoryAssigneeId(story) === currentUserId)
+            );
+
+            setRealProjects(assignedProjects.slice(0, 2));
           } catch (err) {
             console.error("Error fetching projects for profile:", err);
+            setRealProjects([]);
           } finally {
             setLoadingProjects(false);
           }
         };
 
+        // const fetchProfileTasks = async () => {
+        //   try {
+        //     const response = await fetch(`https://flowio-backend.vercel.app/api/tasks/my-tasks`, {
+        //       method: "GET",
+        //       headers: {
+        //         "Content-Type": "application/json",
+        //         "x-auth-token": token,
+        //         "Authorization": `Bearer ${token}`
+        //       },
+        //     });
+        //     if (response.ok) {
+        //       const resData = await response.json();
+        //       const fetchedTasks = resData.data || (Array.isArray(resData) ? resData : resData.tasks || []);
+        //       setTaskCount(fetchedTasks.length);
+        //     }
+        //   } catch (err) {
+        //     console.error("Error fetching tasks count for profile:", err);
+        //     setTaskCount(0);
+        //   } finally {
+        //     setLoadingTasks(false);
+        //   }
+        // };
         const fetchProfileTasks = async () => {
-          try {
-            const response = await fetch(`https://flowio-backend.vercel.app/api/tasks/my-tasks`, {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                "x-auth-token": token,
-                "Authorization": `Bearer ${token}`
-              },
-            });
-            if (response.ok) {
-              const resData = await response.json();
-              const fetchedTasks = resData.data || (Array.isArray(resData) ? resData : resData.tasks || []);
-              setTaskCount(fetchedTasks.length);
-            }
-          } catch (err) {
-            console.error("Error fetching tasks count for profile:", err);
-            setTaskCount(0);
-          } finally {
-            setLoadingTasks(false);
-          }
-        };
+  try {
+    const tasks = await taskService.getMyTasks(); // all my tasks, no filter
+    const list = Array.isArray(tasks) ? tasks : [];
+    setTaskCount(list.length);
+
+    const doneCount = list.filter((t) => {
+      const status = String(t?.status || "").toLowerCase();
+      return status === "done" || status === "completed";
+    }).length;
+
+    const percent = list.length ? Math.round((doneCount / list.length) * 100) : 0;
+    setTaskProgress(percent);
+  } catch (err) {
+    console.error("Error fetching tasks count for profile:", err);
+    setTaskCount(0);
+    setTaskProgress(0);
+  } finally {
+    setLoadingTasks(false);
+  }
+};
 
         // Fetch teams using the companyId
         if (companyId) {
           fetchUserTeams(companyId, token);
         }
 
-        fetchProfileProjects();
+        const currentUserId = String(
+          decoded._id ||
+          decoded.id ||
+          decoded.userId ||
+          decoded.user?._id ||
+          decoded.user?.id ||
+          localStorage.getItem("userId") ||
+          ""
+        );
+
+        fetchProfileProjects(currentUserId);
         fetchProfileTasks();
       } catch (error) {
         console.error("Error decoding token in profile:", error);
@@ -210,31 +300,32 @@ export default function Profile() {
           {/* PROJECTS SECTION */}
           <div className={`${card} p-5`}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[17px] font-bold">Projects In Progress</h3>
+              <h3 className="text-[17px] font-bold">My Assigned Projects</h3>
               <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[10px] font-bold text-[#78aaff]">
-                {loadingProjects ? "..." : `${realProjects.length} Active`}
+                {loadingProjects ? "..." : `${realProjects.length} Assigned`}
               </span>
             </div>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:h-[calc(100%-38px)]">
               {loadingProjects ? (
                 <div className="col-span-2 flex items-center justify-center text-sm text-cyan-400 animate-pulse">
-                  Loading active workspace projects...
+                  Loading assigned projects...
                 </div>
               ) : realProjects.length === 0 ? (
                 <div className="col-span-2 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-[24px] text-white/40 text-xs p-4 text-center">
-                  <p className="mb-2">No active projects found for this company.</p>
+                  <p className="mb-2">No projects assigned to you yet.</p>
                   <Link to="/projects" className="text-cyan-400 hover:underline">+ Create Project</Link>
                 </div>
               ) : (
                 realProjects.map((project) => {
                   const projectTitle = project.name || project.title || "Untitled Project";
-                  const progressValue = project.progress !== undefined ? project.progress : 0;
+                  const progressValue = Math.max(0, Math.min(100, Number(project.progress) || 0));
+                  const statusLabel = getProjectStatusLabel(project, progressValue);
                   const style = getProjectStyle(projectTitle);
 
                   return (
                     <Link
-                      to="/projects"
+                      to={project._id || project.id ? `/projects/${project._id || project.id}` : "/projects"}
                       key={project._id || project.id}
                       className="group flex flex-col justify-between rounded-[24px] border border-white/5 bg-[#10184c]/90 p-4 transition-all duration-300 hover:-translate-y-1 hover:bg-[#151f62] hover:shadow-[0_0_25px_rgba(95,150,255,.22)]"
                     >
@@ -262,7 +353,7 @@ export default function Profile() {
                         </div>
                         <div className="mt-3 flex justify-between text-[10px] text-white/50">
                           <span>Recent Updates</span>
-                          <span>Active</span>
+                          <span>{statusLabel}</span>
                         </div>
                       </div>
                     </Link>
@@ -347,7 +438,7 @@ export default function Profile() {
 
           <div className="mb-5 grid grid-cols-3 gap-2">
             {[
-              [<FaChartLine />, "80%", "Progress"],
+              [<FaChartLine />, loadingTasks ? "..." : `${taskProgress}%`, "Progress"],
               [<FaTasks />, loadingTasks ? "..." : `${taskCount}`, "Tasks"],
               [<FaUsers />, loadingTeams ? "..." : `${teams.length}`, "Teams"],
             ].map((item) => (

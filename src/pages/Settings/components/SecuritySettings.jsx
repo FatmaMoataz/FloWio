@@ -15,6 +15,7 @@ import {
   FaInfoCircle,
   FaSpinner,
 } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const API_BASE = "https://flowio-backend.vercel.app/api";
@@ -65,7 +66,7 @@ const Toast = ({ message, type = "info" }) => {
   };
   return (
     <div
-      className={`fixed right-8 top-8 z-[9999] rounded-[18px] border px-5 py-4 text-sm font-bold text-white shadow-[0_20px_50px_rgba(0,0,0,.45)] ${colors[type]}`}
+      className={`fixed left-3 right-3 top-4 z-[9999] rounded-[18px] border px-4 py-3 text-sm font-bold text-white shadow-[0_20px_50px_rgba(0,0,0,.45)] sm:left-auto sm:right-8 sm:top-8 sm:px-5 sm:py-4 ${colors[type]}`}
     >
       {message}
     </div>
@@ -98,6 +99,7 @@ export default function SecuritySettings() {
   // ── 2FA ──
   const [twoFA, setTwoFA] = useState(false);
   const [twoFALoading, setTwoFALoading] = useState(false);
+  const navigate = useNavigate();
 
   // ── Sessions ──
   const [sessions, setSessions] = useState([
@@ -212,22 +214,44 @@ export default function SecuritySettings() {
   };
 
   // ── Logout all devices — calls POST /api/auth/logout-all ──
+  // const logoutAllDevices = async () => {
+  //   setLogoutAllLoading(true);
+  //   try {
+  //     await apiRequest("/auth/logout-all", { method: "POST" });
+  //     setSessions((prev) =>
+  //       prev.map((s) =>
+  //         s.current ? s : { ...s, active: false, status: "Logged Out", time: "Just now" }
+  //       )
+  //     );
+  //     showToast("All other devices logged out", "success");
+  //   } catch (err) {
+  //     showToast(err.message || "Failed to logout all devices", "error");
+  //   } finally {
+  //     setLogoutAllLoading(false);
+  //   }
+  // };
   const logoutAllDevices = async () => {
-    setLogoutAllLoading(true);
-    try {
-      await apiRequest("/auth/logout-all", { method: "POST" });
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.current ? s : { ...s, active: false, status: "Logged Out", time: "Just now" }
-        )
-      );
-      showToast("All other devices logged out", "success");
-    } catch (err) {
-      showToast(err.message || "Failed to logout all devices", "error");
-    } finally {
-      setLogoutAllLoading(false);
-    }
-  };
+  setLogoutAllLoading(true);
+  try {
+    await apiRequest("/auth/logout-all", { method: "POST" });
+
+    // logout-all revokes every refresh token for this user — including
+    // this browser's session — so we need to actually log out here too.
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userAvatar");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("companyId");
+    localStorage.removeItem("userId");
+
+    showToast("Logged out from all devices", "success");
+    setTimeout(() => navigate("/login"), 800); // brief pause so the toast is visible
+  } catch (err) {
+    showToast(err.message || "Failed to logout all devices", "error");
+    setLogoutAllLoading(false);
+  }
+};
 
   // ── Download security report ──
   const downloadReport = () => {
@@ -283,7 +307,7 @@ export default function SecuritySettings() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_.85fr] lg:gap-6">
 
         {/* Password card */}
-        <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
+        <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-[15px] bg-blue-400/15 text-[#78aaff]">
               <FaLock />
@@ -342,7 +366,7 @@ export default function SecuritySettings() {
         </div>
 
         {/* 2FA card */}
-        <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
+        <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-[15px] bg-blue-400/15 text-[#78aaff]">
               <FaShieldAlt />
@@ -385,8 +409,8 @@ export default function SecuritySettings() {
       </div>
 
       {/* ── Sessions ── */}
-      <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69]">
-        <div className="mb-5 flex items-center justify-between">
+      <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-[17px] font-bold">Device Login History</h3>
             <p className="mt-1 text-[11px] text-white/45">Review active sessions and recent login activity.</p>
@@ -396,7 +420,7 @@ export default function SecuritySettings() {
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {sessions.map((session) => (
             <div
               key={session.id}
@@ -450,13 +474,13 @@ export default function SecuritySettings() {
       </div>
 
       {/* ── Bottom action bar ── */}
-      <div className="flex items-center justify-between rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-5 shadow-[0_18px_40px_rgba(0,0,0,.18)]">
-        <div className="flex gap-3">
+      <div className="flex flex-col gap-3 rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] sm:rounded-[26px] sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
             onClick={logoutAllDevices}
             disabled={logoutAllLoading}
-            className="flex h-11 items-center gap-2 rounded-[16px] bg-red-400/15 px-5 text-sm font-bold text-[#ff6b8a] transition hover:bg-red-400/25 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex h-11 items-center justify-center gap-2 rounded-[16px] bg-red-400/15 px-5 text-sm font-bold text-[#ff6b8a] transition hover:bg-red-400/25 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {logoutAllLoading ? <FaSpinner className="animate-spin" /> : <FaSignOutAlt />}
             {logoutAllLoading ? "Logging out…" : "Logout All Devices"}
@@ -465,7 +489,7 @@ export default function SecuritySettings() {
           <button
             type="button"
             onClick={downloadReport}
-            className={`flex h-11 items-center gap-2 rounded-[16px] px-5 text-sm font-bold transition ${
+            className={`flex h-11 items-center justify-center gap-2 rounded-[16px] px-5 text-sm font-bold transition ${
               reportDownloaded
                 ? "bg-emerald-400/20 text-[#5fffd0]"
                 : "bg-blue-400/15 text-[#78aaff] hover:bg-blue-400/25"

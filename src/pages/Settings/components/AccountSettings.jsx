@@ -259,7 +259,7 @@ setPendingAvatarUrl(null);
     <div className="animate-[fadeUp_.35s_ease] space-y-6 pb-4">
       {/* Toast */}
       {message && (
-        <div className={`fixed right-8 top-8 z-[9999] rounded-[18px] border px-5 py-4 text-sm font-bold text-white shadow-[0_20px_50px_rgba(0,0,0,.45)]
+        <div className={`fixed left-3 right-3 top-4 z-[9999] rounded-[18px] border px-4 py-3 text-sm font-bold text-white shadow-[0_20px_50px_rgba(0,0,0,.45)] sm:left-auto sm:right-8 sm:top-8 sm:px-5 sm:py-4
           ${messageType === "error" ? "border-red-400/20 bg-[#3a1020]" : "border-blue-300/15 bg-[#10184c]"}`}
         >
           {message}
@@ -268,7 +268,7 @@ setPendingAvatarUrl(null);
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[.9fr_1.1fr] lg:gap-6">
         {/* Profile Picture */}
-        <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
+        <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
           <h3 className="mb-2 text-[17px] font-bold">Profile Picture</h3>
           <p className="mb-6 text-[11px] text-white/45">
             Hosted on Cloudinary — syncs across all devices.
@@ -337,11 +337,11 @@ setPendingAvatarUrl(null);
         </div>
 
         {/* Personal Information */}
-        <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
+        <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
           <h3 className="mb-2 text-[17px] font-bold">Personal Information</h3>
           <p className="mb-6 text-[11px] text-white/45">Update your account profile details.</p>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {renderInputField(<FaUser />, "Full Name", account.fullName, (v) => updateAccount("fullName", v), "Enter full name")}
             {renderInputField(<FaEnvelope />, "Email Address", account.email, null, "—", "email", true)}
             {renderInputField(<FaPhoneAlt />, "Phone Number", localFields.phone, (v) => updateLocal("phone", v), "Enter phone number")}
@@ -358,13 +358,13 @@ setPendingAvatarUrl(null);
       </div>
 
       {/* Social Links */}
-      <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69]">
+      <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
         <h3 className="mb-2 text-[17px] font-bold">Social Links</h3>
         <p className="mb-6 text-[11px] text-white/45">
           Add your professional and social media links.{" "}
           <span className="text-white/30">(Saved locally on this device)</span>
         </p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {renderInputField(<FaLinkedinIn />, "LinkedIn", localFields.linkedin, (v) => updateLocal("linkedin", v), "LinkedIn profile link")}
           {renderInputField(<FaGithub />, "GitHub", localFields.github, (v) => updateLocal("github", v), "GitHub profile link")}
           {renderInputField(<FaFacebookF />, "Facebook", localFields.facebook, (v) => updateLocal("facebook", v), "Facebook profile link")}
@@ -372,10 +372,10 @@ setPendingAvatarUrl(null);
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-5 shadow-[0_18px_40px_rgba(0,0,0,.18)]">
-        <div className="flex gap-3">
+      <div className="flex flex-col gap-4 rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] sm:rounded-[26px] sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button type="button" onClick={resetAccount}
-            className="flex h-11 items-center gap-2 rounded-[16px] bg-blue-400/15 px-5 text-sm font-bold text-[#78aaff] transition hover:bg-blue-400/25"
+            className="flex h-11 items-center justify-center gap-2 rounded-[16px] bg-blue-400/15 px-5 text-sm font-bold text-[#78aaff] transition hover:bg-blue-400/25"
           >
             <FaUndo /> Reset
           </button>
@@ -387,14 +387,14 @@ setPendingAvatarUrl(null);
                 showMessage("Local data cleared");
               }
             }}
-            className="flex h-11 items-center gap-2 rounded-[16px] bg-red-400/15 px-5 text-sm font-bold text-[#ff6b8a] transition hover:bg-red-400/25"
+            className="flex h-11 items-center justify-center gap-2 rounded-[16px] bg-red-400/15 px-5 text-sm font-bold text-[#ff6b8a] transition hover:bg-red-400/25"
           >
             <FaTimes /> Clear Local Data
           </button>
         </div>
 
         <button type="button" onClick={saveAccount} disabled={saving || uploadingAvatar}
-          className={`flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed
+          className={`flex h-11 w-full items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed lg:w-auto lg:min-w-[170px]
             ${saved ? "bg-emerald-400/20 text-[#5fffd0]" : "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_20px_rgba(95,150,255,.30)] hover:-translate-y-1 hover:brightness-110"}`}
         >
           {saving ? <><FaSpinner className="animate-spin" /> Saving…</>

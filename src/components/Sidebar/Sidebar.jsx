@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   FaBriefcase,
-  FaClipboardList,
+  FaThLarge,
   FaUser,
   FaTasks,
   FaUsers,
@@ -14,12 +14,12 @@ import logo from "../../assets/logo.svg";
 const links = [
   {
     to: "/dashboard",
-    icon: <FaBriefcase />,
+    icon: <FaThLarge />,
     label: "Dashboard",
   },
   {
     to: "/projects",
-    icon: <FaClipboardList />,
+    icon: <FaBriefcase />,
     label: "Projects",
   },
   {
@@ -44,54 +44,24 @@ const links = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate, variant = "desktop" }) {
+  const isMobile = variant === "mobile";
+
   return (
     <aside
-      className="flowio-sidebar
-      w-full
-      h-auto
-      shrink-0
-      rounded-[20px]
-      bg-[#0f1437]/90
-      border
-      border-white/5
-      flex
-      flex-row
-      items-center
-      justify-between
-      gap-2
-      overflow-x-auto
-      px-3
-      py-3
-      lg:h-full
-      lg:w-[92px]
-      lg:flex-col
-      lg:overflow-visible
-      lg:rounded-[28px]
-      lg:px-0
-      lg:py-5
-      "
+      className={`flowio-sidebar flex shrink-0 border border-white/5 bg-[#0f1437]/90 ${
+        isMobile
+          ? "h-full w-full flex-col gap-4 overflow-y-auto rounded-[24px] px-4 py-5"
+          : "hidden h-full w-[94px] flex-col items-center justify-between gap-2 overflow-visible rounded-[28px] py-5 md:flex"
+      }`}
     >
       {/* LOGO */}
-
       <NavLink
         to="/dashboard"
-        className="
-        w-11
-        h-11
-        rounded-[14px]
-        overflow-hidden
-        bg-[#05091f]
-        border
-        border-blue-300/20
-        shadow-[0_0_18px_rgba(60,100,255,.18)]
-        flex
-        items-center
-        justify-center
-        lg:h-14
-        lg:w-14
-        lg:rounded-[18px]
-        "
+        onClick={onNavigate}
+        className="h-13 w-13 overflow-hidden rounded-[17px] border border-blue-300/20 bg-[#05091f]
+          shadow-[0_0_18px_rgba(60,100,255,.18)] flex items-center justify-center
+          lg:h-14 lg:w-14 lg:rounded-[18px]"
       >
         <img
           src={logo}
@@ -101,31 +71,27 @@ export default function Sidebar() {
       </NavLink>
 
       {/* NAVIGATION */}
-
-      <nav className="flex flex-1 items-center justify-center gap-1 sm:gap-2 lg:flex-col lg:gap-7">
+      <nav
+        className={`flex flex-1 ${
+          isMobile
+            ? "w-full flex-col gap-2"
+            : "w-full flex-col items-center justify-center gap-7"
+        }`}
+      >
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
-            title={link.label}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `
-              w-10
-              h-10
-              shrink-0
-              rounded-[13px]
-              flex
-              items-center
-              justify-center
-              text-[17px]
-              transition-all
-              duration-300
-              sm:w-11
-              sm:h-11
-              lg:w-12
-              lg:h-12
-              lg:rounded-[16px]
-              lg:text-[20px]
+              relative h-11 shrink-0 rounded-[13px] flex items-center transition-all duration-300
+              ${
+                isMobile
+                  ? "w-full justify-start gap-3 px-4 text-sm font-semibold"
+                  : "w-12 justify-center"
+              }
+              text-[17px] md:h-12 md:rounded-[16px] md:text-[20px]
               ${
                 isActive
                   ? "bg-blue-300/15 text-[#7db6ff] shadow-[0_0_20px_rgba(110,181,255,.25)] scale-105"
@@ -135,33 +101,24 @@ export default function Sidebar() {
             }
           >
             {link.icon}
+            {isMobile && <span>{link.label}</span>}
           </NavLink>
         ))}
       </nav>
 
       {/* SETTINGS */}
-
       <NavLink
         to="/settings"
-        title="Settings"
+        onClick={onNavigate}
         className={({ isActive }) =>
           `
-          w-10
-          h-10
-          shrink-0
-          rounded-[13px]
-          flex
-          items-center
-          justify-center
-          text-[17px]
-          transition-all
-          duration-300
-          sm:w-11
-          sm:h-11
-          lg:w-12
-          lg:h-12
-          lg:rounded-[16px]
-          lg:text-[20px]
+          relative h-10 shrink-0 rounded-[13px] flex items-center transition-all duration-300
+          ${
+            isMobile
+              ? "w-full justify-start gap-3 px-4 text-sm font-semibold"
+              : "w-12 justify-center"
+          }
+          text-[17px] md:h-12 md:rounded-[16px] md:text-[20px]
           ${
             isActive
               ? "bg-blue-300/15 text-[#7db6ff] shadow-[0_0_20px_rgba(110,181,255,.25)] scale-105"
@@ -171,6 +128,7 @@ export default function Sidebar() {
         }
       >
         <FaCog />
+        {isMobile && <span>Settings</span>}
       </NavLink>
     </aside>
   );

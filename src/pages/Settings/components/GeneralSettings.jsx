@@ -105,9 +105,9 @@ const updateToggle = (key) => {
 
   return (
     <div className="animate-[fadeUp_.35s_ease] space-y-6 pb-4">
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         {/* THEME */}
-        <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
+        <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-blue-400/15 text-[#78aaff]">
               <FaPalette />
@@ -128,7 +128,7 @@ const updateToggle = (key) => {
             Mode
           </p>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {["Dark", "Light", "System"].map((item) => (
               <button
                 key={item}
@@ -161,7 +161,7 @@ const updateToggle = (key) => {
         </div>
 
         {/* APP PREFERENCES */}
-        <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69]">
+        <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-blue-400/15 text-[#78aaff]">
               <FaDesktop />
@@ -180,7 +180,7 @@ const updateToggle = (key) => {
             Default Screen
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {["Dashboard", "Projects", "Teams", "Chat", "Meetings"].map(
               (item) => (
                 <button
@@ -219,7 +219,7 @@ const updateToggle = (key) => {
       </div>
 
       {/* NOTIFICATIONS */}
-      <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69]">
+      <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
         <div className="mb-5 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-blue-400/15 text-[#78aaff]">
             <FaBell />
@@ -234,7 +234,7 @@ const updateToggle = (key) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-4">
           {[
             [
               "reports",
@@ -270,10 +270,10 @@ const updateToggle = (key) => {
       </div>
 
       {/* SOCIAL LINKS */}
-      <div className="rounded-[26px] border border-blue-300/10 bg-[#10184c]/75 p-6 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69]">
+      <div className="rounded-[22px] border border-blue-300/10 bg-[#10184c]/75 p-4 shadow-[0_18px_40px_rgba(0,0,0,.18)] transition-all duration-300 hover:bg-[#141f69] sm:rounded-[26px] sm:p-6">
         <h3 className="mb-5 text-[16px] font-bold">Social Media Links</h3>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
           {[
             ["linkedin", <FaLinkedinIn />, "LinkedIn URL"],
             ["github", <FaGithub />, "GitHub URL"],
@@ -302,11 +302,11 @@ const updateToggle = (key) => {
       </div>
 
       {/* SAVE */}
-      <div className="flex justify-end">
+      <div className="flex justify-stretch sm:justify-end">
         <button
           type="button"
           onClick={saveChanges}
-          className={`flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 ${
+          className={`flex h-11 w-full items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition-all duration-300 sm:w-auto sm:min-w-[170px] ${
             saved
               ? "bg-emerald-400/20 text-[#5fffd0]"
               : "bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_20px_rgba(95,150,255,.30)] hover:-translate-y-1 hover:brightness-110"
