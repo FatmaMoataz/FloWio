@@ -754,35 +754,40 @@ export default function Projects() {
     }
   };
 
-  const handleArchiveProject = async (project) => {
-    const projectId = project?._id;
-    if (!projectId) return;
+const handleArchiveProject = async (project) => {
+  const projectId = project?._id;
+  if (!projectId) return;
 
-    setOpenMenuId(null);
+  setOpenMenuId(null);
 
+  // Optimistic update - update local state immediately
+  setProjects((prev) =>
+    prev.map((item) =>
+      item._id === projectId
+        ? { ...item, status: "archived", isArchived: true, archivedAt: new Date().toISOString() }
+        : item,
+    ),
+  );
+
+  try {
+    // Use the dedicated archive endpoint (POST, not PUT)
+    await projectService.archiveProject(projectId);
+    
+    // Switch to Archived tab to show the archived project
+    setFilter("Archived");
+  } catch (err) {
+    // Revert on error
     setProjects((prev) =>
-      prev.map((item) =>
-        item._id === projectId
-          ? { ...item, status: "archived", isArchived: true }
-          : item,
-      ),
+      prev.map((item) => (item._id === projectId ? project : item)),
     );
 
-    try {
-      await projectService.updateProject(projectId, {
-        status: "archived",
-        isArchived: true,
-      });
-
-      setFilter("Archived");
-    } catch (err) {
-      setProjects((prev) =>
-        prev.map((item) => (item._id === projectId ? project : item)),
-      );
-
-      alert(err.message || "Failed to archive project.");
-    }
-  };
+    console.error("Failed to archive project:", err);
+    
+    // Show specific error message
+    const errorMessage = err.response?.data?.message || err.message || "Failed to archive project";
+    alert(errorMessage);
+  }
+};
 
   const visibleProjects = useMemo(() => {
     const query = search.trim().toLowerCase();

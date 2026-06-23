@@ -1,100 +1,128 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaBolt, FaPaperPlane, FaSpinner } from "react-icons/fa";
 import MainLayout from "../../layout/MainLayout";
 import AiSceneArtwork from "./AiSceneArtwork";
 import projectService from "../../services/projectService";
+import chatService from "../../services/chatService";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
+
+const WELCOME_MESSAGE = {
+  role: "assistant",
+  text: "Hello! I'm here to assist you.\nNeed help with your tasks?",
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AiAssistant() {
   const navigate = useNavigate();
   const { projectId } = useParams();
-  
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [reply, setReply] = useState(
-    "Hello! I'm here to assist you.\nNeed help with your tasks?",
-  );
+
+  const [project, setProject]       = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [messages, setMessages]     = useState([WELCOME_MESSAGE]);
+  const [inputText, setInputText]   = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fetch project if projectId exists
+  const messagesEndRef = useRef(null);
+
+  // Auto-scroll whenever messages change
   useEffect(() => {
-    if (projectId) {
-      fetchProject();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // On mount: fetch project + load chat history (if we have a real projectId)
+  useEffect(() => {
+    if (projectId && isValidObjectId(projectId)) {
+      fetchProjectAndHistory();
     }
   }, [projectId]);
 
-  const fetchProject = async () => {
+  const fetchProjectAndHistory = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Only fetch from backend if it looks like a MongoDB ObjectId
-      if (/^[0-9a-fA-F]{24}$/.test(projectId)) {
-        const response = await projectService.getProjectById(projectId);
-        
-        if (response.success && response.data) {
-          setProject(response.data);
-        }
+      const [projectRes, historyRes] = await Promise.all([
+        projectService.getProjectById(projectId),
+        chatService.getHistory(projectId),
+      ]);
+
+      if (projectRes.success && projectRes.data) {
+        setProject(projectRes.data);
+      }
+
+      // If there's prior history, replace the placeholder welcome message
+      if (historyRes.success && historyRes.data.messages?.length > 0) {
+        setMessages(historyRes.data.messages);
       }
     } catch (err) {
-      console.log("Could not fetch project for AI assistant:", err.message);
-      // AI Assistant can work without project context
+      console.warn("[AiAssistant] Setup failed:", err.message);
+      // Non-fatal — the assistant still works without project context
     } finally {
       setLoading(false);
     }
   };
 
-  const submit = (event) => {
+  // ── Send message ─────────────────────────────────────────────────────────────
+
+  const submit = async (event) => {
     event.preventDefault();
-    if (!message.trim() || isProcessing) return;
-    
+    const trimmed = inputText.trim();
+    if (!trimmed || isProcessing) return;
+
+    // Optimistically append user message
+    const optimisticUser = { role: "user", text: trimmed };
+    setMessages((prev) => [...prev, optimisticUser]);
+    setInputText("");
     setIsProcessing(true);
-    
-    // Simulate AI processing
-    setTimeout(() => {
-      const userMessage = message.trim();
-      let aiResponse = "";
-      
-      if (project) {
-        aiResponse = `I'm analyzing "${userMessage}" for the project "${project.name}".\n\n`;
-        
-        if (userMessage.toLowerCase().includes("task") || userMessage.toLowerCase().includes("create")) {
-          aiResponse += "I can help you create tasks for this project. What would you like to accomplish?\n\n";
-          aiResponse += "For example:\n• Create a new task\n• Assign tasks to team members\n• Set task priorities and deadlines";
-        } else if (userMessage.toLowerCase().includes("progress") || userMessage.toLowerCase().includes("status")) {
-          aiResponse += "Based on the current project data, I can provide insights on:\n• Overall project progress\n• Task completion rates\n• Bottlenecks and blockers";
-        } else if (userMessage.toLowerCase().includes("deadline") || userMessage.toLowerCase().includes("schedule")) {
-          aiResponse += "I can help you manage project timelines by:\n• Suggesting realistic deadlines\n• Identifying scheduling conflicts\n• Recommending task prioritization";
-        } else {
-          aiResponse += "I'm here to help with:\n• Task management and organization\n• Project planning and scheduling\n• Progress tracking and reporting\n• Team collaboration suggestions";
-        }
+
+    try {
+      const result = await chatService.sendMessage(projectId, trimmed);
+
+      if (result.success) {
+        setMessages((prev) => [...prev, result.data.reply]);
       } else {
-        aiResponse = `I'm here to help you with your projects and tasks.\n\n`;
-        aiResponse += "You can ask me about:\n• Creating and organizing projects\n• Managing tasks and deadlines\n• Improving team productivity\n• Project planning best practices";
+        throw new Error("Unexpected response shape");
       }
-      
-      setReply(aiResponse);
-      setMessage("");
+    } catch (err) {
+      console.error("[AiAssistant] sendMessage failed:", err.message);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
+          isError: true,
+        },
+      ]);
+    } finally {
       setIsProcessing(false);
-    }, 1000);
+    }
   };
 
+  // ── Navigation ───────────────────────────────────────────────────────────────
+
   const handleBack = () => {
-    if (project && project._id) {
+    if (project?._id) {
       navigate(`/projects/${project._id}`);
     } else {
       navigate("/projects");
     }
   };
 
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   return (
     <MainLayout>
       <section className="flowio-projects-page flowio-ai-fullscreen relative flex h-full min-h-[650px] flex-col overflow-hidden rounded-[30px] border border-[#18226f]/60 bg-[radial-gradient(circle_at_50%_70%,#14105c_0%,#090c4f_35%,#05072d_76%)] p-5 text-white sm:p-7 lg:min-h-0">
+
+        {/* ── Header ── */}
         <header className="relative z-20 flex items-center gap-4">
-          <button 
-            type="button" 
-            onClick={handleBack} 
-            className="rounded-lg p-2 text-white/80 hover:bg-white/10 transition" 
+          <button
+            type="button"
+            onClick={handleBack}
+            className="rounded-lg p-2 text-white/80 hover:bg-white/10 transition"
             aria-label="Back to project"
           >
             <FaArrowLeft />
@@ -119,35 +147,69 @@ export default function AiAssistant() {
           </div>
         </header>
 
-        <div className="relative z-10 flex flex-1 items-center justify-center pb-24">
-          <div className="flowio-ai-full-message relative z-20 max-w-2xl whitespace-pre-line rounded-[24px] bg-[#121a4c]/90 px-10 py-5 text-sm leading-5 text-white/70 shadow-xl max-h-[60vh] overflow-y-auto">
-            {isProcessing ? (
-              <div className="flex items-center gap-2">
-                <FaSpinner className="animate-spin text-xs" />
-                <span>Processing...</span>
+        {/* ── Message thread ── */}
+        <div className="relative z-10 flex flex-1 flex-col gap-3 overflow-y-auto pb-6 pt-4 px-1">
+          {messages.map((msg, i) => (
+            <div
+              key={i}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`
+                  max-w-[78%] whitespace-pre-line rounded-[18px] px-5 py-3 text-sm leading-5 shadow-md
+                  ${msg.role === "user"
+                    ? "bg-[#2a3a8f] text-white/90"
+                    : msg.isError
+                      ? "bg-[#3a1a1a]/90 text-red-300/80"
+                      : "bg-[#121a4c]/90 text-white/70"
+                  }
+                `}
+              >
+                {msg.text}
               </div>
-            ) : (
-              reply
-            )}
-          </div>
-          <AiSceneArtwork className="absolute inset-x-0 bottom-0 mx-auto h-auto max-h-[70%] w-full object-contain opacity-65" />
-          <div className="absolute bottom-0 left-1/2 h-44 w-[72%] -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
+            </div>
+          ))}
+
+          {/* Typing indicator */}
+          {isProcessing && (
+            <div className="flex justify-start">
+              <div className="bg-[#121a4c]/90 rounded-[18px] px-5 py-3 flex items-center gap-2 text-white/50 text-sm">
+                <FaSpinner className="animate-spin text-xs" />
+                <span>Thinking…</span>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
         </div>
 
-        <form 
-          onSubmit={submit} 
+        {/* ── Artwork + glow (decorative, sits behind thread) ── */}
+        <AiSceneArtwork className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-auto max-h-[40%] w-full object-contain opacity-20" />
+        <div className="pointer-events-none absolute bottom-0 left-1/2 h-44 w-[72%] -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
+
+        {/* ── Input bar ── */}
+        <form
+          onSubmit={submit}
           className="flowio-ai-full-input relative z-20 mx-auto flex w-full max-w-4xl items-center rounded-full border border-[#23347e]/50 bg-[#0d164d]/95 px-5 py-3 shadow-[0_14px_35px_rgba(1,4,30,.28)]"
         >
-          <input 
-            value={message} 
-            onChange={(event) => setMessage(event.target.value)} 
-            placeholder={project ? `Ask about ${project.name}...` : "Ask anything about your projects..."} 
+          <input
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder={
+              project
+                ? `Ask about ${project.name}…`
+                : "Ask anything about your projects…"
+            }
             className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/35"
             disabled={isProcessing}
           />
-          <button 
-            type="submit" 
-            className={`transition ${isProcessing ? 'text-white/30 cursor-not-allowed' : 'text-[#4d8eea] hover:text-[#6aa8f5]'}`}
+          <button
+            type="submit"
+            className={`transition ${
+              isProcessing
+                ? "cursor-not-allowed text-white/30"
+                : "text-[#4d8eea] hover:text-[#6aa8f5]"
+            }`}
             disabled={isProcessing}
           >
             <FaPaperPlane />

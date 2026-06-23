@@ -1,67 +1,3 @@
-// import API, { handleError } from "./api";
-
-// const projectService = {
-//   // Get all projects for a company
-//   getProjectsByCompany: async (companyId) => {
-//     try {
-//       const response = await API.get(`/api/projects/company/${companyId}`);
-//       return response.data;
-//     } catch (error) {
-//       throw handleError(error);
-//     }
-//   },
-
-//   // Get single project by ID
-//   getProjectById: async (projectId) => {
-//     try {
-//       const response = await API.get(`/api/projects/${projectId}`);
-//       return response.data;
-//     } catch (error) {
-//       throw handleError(error);
-//     }
-//   },
-
-//   // Create new project
-//   createProject: async (projectData) => {
-//     try {
-//       const response = await API.post("/api/projects", projectData);
-//       return response.data;
-//     } catch (error) {
-//       throw handleError(error);
-//     }
-//   },
-
-//   // Update project
-//   updateProject: async (projectId, projectData) => {
-//     try {
-//       const response = await API.put(`/api/projects/${projectId}`, projectData);
-//       return response.data;
-//     } catch (error) {
-//       throw handleError(error);
-//     }
-//   },
-
-//   // Delete project
-//   deleteProject: async (projectId) => {
-//     try {
-//       const response = await API.delete(`/api/projects/${projectId}`);
-//       return response.data;
-//     } catch (error) {
-//       throw handleError(error);
-//     }
-//   },
-// };
-
-// updateProjectStatusFromStories: async (projectId) => {
-//   try {
-//     const response = await API.put(`/api/projects/${projectId}/update-status`);
-//     return response.data;
-//   } catch (error) {
-//     throw handleError(error);
-//   }
-// };
-
-// export default projectService;
 import API, { handleError } from "./api";
 
 const projectService = {
@@ -110,6 +46,36 @@ const projectService = {
     }
   },
 
+  // ✅ NEW: Archive a project using the dedicated archive endpoint
+  archiveProject: async (projectId) => {
+    try {
+      const response = await API.post(`/api/archive/project/${projectId}`);
+      return response.data;
+    } catch (error) {
+      throw handleError(error);
+    }
+  },
+
+  // ✅ NEW: Restore (unarchive) a project
+  restoreProject: async (projectId) => {
+    try {
+      const response = await API.delete(`/api/archive/${projectId}`);
+      return response.data;
+    } catch (error) {
+      throw handleError(error);
+    }
+  },
+
+  // ✅ NEW: Get all archived items for a company
+  getArchivedByCompany: async (companyId) => {
+    try {
+      const response = await API.get(`/api/archive/company/${companyId}`);
+      return response.data;
+    } catch (error) {
+      throw handleError(error);
+    }
+  },
+
   deleteProject: async (projectId) => {
     try {
       const response = await API.delete(`/api/projects/${projectId}`);
@@ -120,13 +86,13 @@ const projectService = {
   },
 
   updateProjectStatusFromStories: async (projectId) => {
-  try {
-    const response = await API.put(`/api/projects/${projectId}/update-status`);
-    return response.data;
-  } catch (error) {
-    throw handleError(error);
-  }
-},
+    try {
+      const response = await API.put(`/api/projects/${projectId}/update-status`);
+      return response.data;
+    } catch (error) {
+      throw handleError(error);
+    }
+  },
 };
 
 export default projectService;
