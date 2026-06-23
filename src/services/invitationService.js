@@ -1,20 +1,19 @@
 import API, { handleError } from "./api";
 
 const invitationService = {
-  sendInvitation: async (emailInvited, companyId) => {
+  sendInvitation: async (emailInvited, companyId, role) => {
     try {
-      const response = await API.post("/api/invitations", { emailInvited, companyId });
-      return response.data.data; // real invitation doc, with its own token
+      const response = await API.post("/api/invitations", { emailInvited, companyId, role });
+      return response.data.data;
     } catch (error) {
       throw handleError(error);
     }
   },
 
-  // Sends one invite per email and reports which succeeded/failed
-  // individually (one bad email shouldn't block the rest).
-  sendBulkInvitations: async (emails, companyId) => {
+  // role is now passed in so it reaches sendInvitation
+  sendBulkInvitations: async (emails, companyId, role) => {
     const results = await Promise.allSettled(
-      emails.map((email) => invitationService.sendInvitation(email, companyId))
+      emails.map((email) => invitationService.sendInvitation(email, companyId, role))
     );
 
     const succeeded = [];

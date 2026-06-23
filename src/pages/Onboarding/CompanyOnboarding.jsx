@@ -215,6 +215,7 @@ export default function CompanyOnboarding() {
   };
 
   const sendInvites = async () => {
+
     if (emails.length === 0) {
       toast.warning("Add at least one teammate email.");
       return;
@@ -228,7 +229,8 @@ export default function CompanyOnboarding() {
     try {
       const { succeeded, failed } = await invitationService.sendBulkInvitations(
         emails,
-        company._id
+        company._id,
+        inviteRole
       );
 
       if (succeeded.length > 0) {
