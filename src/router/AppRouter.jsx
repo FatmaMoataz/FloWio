@@ -22,7 +22,7 @@ import ToDo from "../pages/To-Do/To-Do";
 import CompanyOnboarding from "../pages/Onboarding/CompanyOnboarding";
 import TaskForm from "../pages/Projects/TaskForm";
 import ForgotPassword from "../pages/Auth/ForgotPassword";
-
+import NotFound from "../pages/NotFound/NotFound";
 
 export default function AppRouter(){
   return (
@@ -53,7 +53,8 @@ export default function AppRouter(){
         <Route path="/projects/:projectId/tasks/new" element={<TaskForm />} />
         <Route path="/projects/:projectId/tasks/:taskId/edit" element={<TaskForm />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-
+        <Route path="*" element={<NotFound />} />
+        
       </Routes>
     </BrowserRouter>
   )

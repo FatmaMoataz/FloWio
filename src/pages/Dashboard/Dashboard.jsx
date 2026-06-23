@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "../../layout/MainLayout";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import notificationService from "../../services/notificationService";
 import API from "../../services/api";
 import storyService from "../../services/storyService";
-
-import {
+import AnimatedCard from "../../components/Animation/AnimatedCard";import {
   FaProjectDiagram,
   FaTasks,
   FaCalendarAlt,
@@ -20,9 +19,13 @@ import {
   FaChevronUp,
   FaCircle,
   FaClock,
+  FaVideo,
+  FaFileAlt,
+  FaCalendarCheck,
+  FaRobot,
 } from "react-icons/fa";
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const typeStyle = {
   system:       { icon: <FaBell />,         color: "bg-cyan-400/20 text-cyan-300" },
@@ -77,7 +80,7 @@ const getProjectDisplayStatus = (project) => {
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const capitalizeWords = (str = "") =>
   str.trim().split(/\s+/).map((w) => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(" ");
@@ -123,7 +126,7 @@ const priorityBadge = (p) => {
   return null;
 };
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Collapsible card showing one team member and their to-do stories */
 function MemberStoryCard({ person }) {
@@ -143,7 +146,7 @@ function MemberStoryCard({ person }) {
 
   return (
     <div className="rounded-[20px] bg-[#10184c]/60 transition hover:bg-[#151f62]">
-      {/* Header row — always visible */}
+      {/* Header row â€” always visible */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 p-4 text-left"
@@ -181,7 +184,7 @@ function MemberStoryCard({ person }) {
           {/* Story count badges */}
           {todoStories.length > 0 && (
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
-              {todoStories.length} to‑do
+              {todoStories.length} toâ€‘do
             </span>
           )}
           {inProgressStories.length > 0 && (
@@ -284,7 +287,7 @@ function StoryRow({ story }) {
   );
 }
 
-// ── Main Dashboard ─────────────────────────────────────────────────────────────
+// â”€â”€ Main Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function Dashboard() {
   const [notifications,         setNotifications]         = useState([]);
@@ -303,7 +306,7 @@ export default function Dashboard() {
   const [loadingDiscipline,     setLoadingDiscipline]     = useState(true);
 
   const token = localStorage.getItem("token");
-
+  const navigate = useNavigate(); 
   useEffect(() => {
     if (!token) return;
 
@@ -326,7 +329,7 @@ export default function Dashboard() {
           "Authorization": `Bearer ${token}`,
         };
 
-        // ── 1. Projects & Stories ────────────────────────────────────────────
+        // â”€â”€ 1. Projects & Stories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         let fetchedProjects = [];
         let allStories = [];
         if (companyId) {
@@ -416,7 +419,7 @@ export default function Dashboard() {
           }
         }
 
-        // ── 2. Meetings ──────────────────────────────────────────────────────
+        // â”€â”€ 2. Meetings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (companyId && fetchedProjects.length > 0) {
           setLoadingMeetings(true);
           try {
@@ -450,7 +453,7 @@ export default function Dashboard() {
           setLoadingMeetings(false);
         }
 
-        // ── 3. Teams + per-member story discipline ───────────────────────────
+        // â”€â”€ 3. Teams + per-member story discipline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (companyId) {
           setLoadingTeams(true);
           setLoadingDiscipline(true);
@@ -459,7 +462,7 @@ export default function Dashboard() {
             const fetchedTeams = teamsResp.data?.data ||
               (Array.isArray(teamsResp.data) ? teamsResp.data : []);
 
-            // personMap: userId (string) → { id, name, role, stories[] }
+            // personMap: userId (string) â†’ { id, name, role, stories[] }
             const personMap = new Map();
 
             if (fetchedTeams.length > 0) {
@@ -589,7 +592,7 @@ export default function Dashboard() {
           setLoadingDiscipline(false);
         }
 
-        // ── 4. Notifications ─────────────────────────────────────────────────
+        // â”€â”€ 4. Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (realUserId) {
           setLoadingNotif(true);
           try {
@@ -638,206 +641,237 @@ export default function Dashboard() {
     run();
   }, [token]);
 
-  // ── Shared card styles ─────────────────────────────────────────────────────
+  // â”€â”€ Shared card styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const cardClass =
     "relative overflow-hidden rounded-[28px] border border-white/5 bg-gradient-to-br from-[#16206d]/95 to-[#0d1448]/95 p-5 xl:p-6 shadow-[0_22px_55px_rgba(0,0,0,.30)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_28px_rgba(95,150,255,.20)]";
 
   const kpiItems = [
-    { icon: <FaProjectDiagram />, label: "Projects",     value: loadingProjects ? "…" : String(projectStats.total),    sub: `${projectStats.active} active` },
-    { icon: <FaTasks />,          label: "Tasks",        value: loadingStories  ? "…" : String(storyStats.total),      sub: `${storyStats.pending} pending` },
-    { icon: <FaCalendarAlt />,    label: "Meetings",     value: loadingMeetings ? "…" : String(meetingStats.total),    sub: `${meetingStats.today} today` },
-    { icon: <FaUsers />,          label: "Team Members", value: loadingTeams    ? "…" : String(teamStats.membersCount),sub: `${teamStats.total} teams` },
+    { icon: <FaProjectDiagram />, label: "Projects",     value: loadingProjects ? "â€¦" : String(projectStats.total),    sub: `${projectStats.active} active` },
+    { icon: <FaTasks />,          label: "Tasks",        value: loadingStories  ? "â€¦" : String(storyStats.total),      sub: `${storyStats.pending} pending` },
+    { icon: <FaCalendarAlt />,    label: "Meetings",     value: loadingMeetings ? "â€¦" : String(meetingStats.total),    sub: `${meetingStats.today} today` },
+    { icon: <FaUsers />,          label: "Team Members", value: loadingTeams    ? "â€¦" : String(teamStats.membersCount),sub: `${teamStats.total} teams` },
   ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const projectProgressItems = [
     ["Done", `${projectProgressStats.donePercent}%`, PROJECT_STATUS_COLORS.done],
     ["In Progress", `${projectProgressStats.inProgressPercent}%`, PROJECT_STATUS_COLORS.inProgress],
     ["To Do", `${projectProgressStats.toDoPercent}%`, PROJECT_STATUS_COLORS.todo],
   ];
 
-  return (
-    <MainLayout title="Dashboard" showSearch={false}>
-      <div className="grid min-h-0 gap-5 text-white lg:h-full lg:grid-rows-[clamp(78px,10vh,92px)_minmax(0,1fr)] xl:gap-6">
-
-        {/* ── KPI CARDS ─────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-          {kpiItems.map((item) => (
-            <div
-              key={item.label}
-              className="flex min-h-[86px] items-center gap-4 rounded-[20px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 px-4 shadow-[0_16px_35px_rgba(0,0,0,.24)] transition hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(95,150,255,.18)] sm:rounded-[24px] sm:px-5"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)]">
-                {item.icon}
-              </div>
-              <div>
-                <p className="text-[11px] text-white/45">{item.label}</p>
-                <h3 className="text-[20px] font-extrabold">{item.value}</h3>
-                <p className="text-[10px] text-[#78aaff]">{item.sub}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── MAIN GRID ──────────────────────────────────────────────────────── */}
-        <div className="grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-2 lg:grid-rows-[minmax(250px,0.95fr)_minmax(250px,1fr)] xl:gap-6">
-
-          {/* PROJECT PROGRESS */}
-          <div className={cardClass}>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[17px] font-bold">Project Progress</h3>
-              <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[10px] font-bold text-[#78aaff]">
-                This Month
-              </span>
+ return (
+  <MainLayout title="Dashboard" showSearch={false}>
+    <div className="grid min-h-0 gap-5 text-white lg:h-full lg:grid-rows-[clamp(78px,10vh,92px)_minmax(0,1fr)] xl:gap-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+        {kpiItems.map((item, index) => (
+          <AnimatedCard
+            key={item.label}
+            delay={index * 0.08}
+            className="flex min-h-[86px] items-center gap-4 rounded-[20px] border border-white/5 bg-gradient-to-br from-[#151e66]/95 to-[#0c123f]/95 px-4 shadow-[0_16px_35px_rgba(0,0,0,.24)] transition sm:rounded-[24px] sm:px-5"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-white shadow-[0_0_18px_rgba(95,150,255,.35)]">
+              {item.icon}
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-[160px_1fr] sm:items-center lg:h-[calc(100%-44px)] lg:grid-cols-[190px_1fr] lg:gap-7">
-              {/* Donut */}
-              <div className="relative mx-auto h-[150px] w-[150px] rounded-full shadow-[0_0_38px_rgba(69,230,139,.20)] lg:h-[175px] lg:w-[175px]"
-                style={{
-                  "--done": `${projectProgressStats.donePercent * 3.6}deg`,
-                  "--inp":  `${projectProgressStats.inProgressPercent * 3.6}deg`,
-                  background: `conic-gradient(
-                    ${PROJECT_STATUS_COLORS.done} 0deg var(--done),
-                    ${PROJECT_STATUS_COLORS.gap} var(--done) calc(var(--done) + 6deg),
-                    ${PROJECT_STATUS_COLORS.inProgress} calc(var(--done) + 6deg) calc(var(--done) + 6deg + var(--inp)),
-                    ${PROJECT_STATUS_COLORS.gap} calc(var(--done) + 6deg + var(--inp)) calc(var(--done) + 12deg + var(--inp)),
-                    ${PROJECT_STATUS_COLORS.todo} calc(var(--done) + 12deg + var(--inp)) 360deg
-                  )`,
-                }}
-              >
-                <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[30px] font-extrabold lg:text-[34px]">
-                    {projectProgressStats.donePercent}%
-                  </span>
-                  <span className="text-[11px] text-white/65">Completed</span>
-                </div>
-              </div>
-
-              {/* Bars */}
-              <div className="space-y-4">
-                {projectProgressItems.map(([label, value, color]) => (
-                  <div key={label}>
-                    <div className="mb-2 flex items-center justify-between text-[12px]">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
-                        <span className="text-white/70">{label}</span>
-                      </div>
-                      <b>{value}</b>
-                    </div>
-                    <div className="h-[6px] rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: value, backgroundColor: color }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div>
+              <p className="text-[11px] text-white/45">{item.label}</p>
+              <h3 className="text-[20px] font-extrabold">{item.value}</h3>
+              <p className="text-[10px] text-[#78aaff]">{item.sub}</p>
             </div>
-          </div>
-
-          {/* STORIES BAR CHART (kept as "Tasks Progress" label) */}
-          <div className={cardClass}>
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-[17px] font-bold">Tasks Progress</h3>
-              <FaChartBar className="text-[#78aaff]" />
-            </div>
-
-            <div className="relative mx-auto h-[180px] w-full max-w-[620px] sm:w-[88%] lg:h-[clamp(156px,20vh,205px)]">
-              {["18%", "42%", "66%", "90%"].map((top) => (
-                <div key={top} style={{ top }} className="absolute left-0 right-0 h-px bg-white/10" />
-              ))}
-              <div className="absolute inset-0 flex items-end justify-around pb-6">
-                {storyBarData.map(([name, value]) => (
-                  <div key={name} className="flex min-w-0 flex-col items-center">
-                    <div className="relative flex h-[clamp(98px,13vh,135px)] w-[clamp(30px,3.4vw,38px)] items-end rounded-[14px] bg-white/10 p-[4px]">
-                      <div
-                        style={{ height: `${value}%` }}
-                        className="w-full rounded-[10px] bg-gradient-to-t from-[#6eb5ff] to-[#5b7dff] shadow-[0_0_20px_rgba(95,150,255,.35)] transition-all duration-500"
-                      />
-                    </div>
-                    <span className="mt-2 max-w-[50px] truncate text-center text-[10px] text-white/75">{name}</span>
-                    <span className="mt-1 text-[9px] text-[#78aaff]">{value}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* TEAM DISCIPLINE — collapsible per-member story lists */}
-          <div className={`${cardClass} flex flex-col`}>
-            <div className="mb-5 flex shrink-0 items-center justify-between">
-              <div>
-                <h3 className="text-[17px] font-bold">Team Discipline</h3>
-                <p className="mt-0.5 text-[11px] text-white/35">Click a member to see their stories</p>
-              </div>
-              <Link
-                to="/teams"
-                className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100"
-              >
-                View Team <FaArrowRight />
-              </Link>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {loadingDiscipline ? (
-                <div className="py-8 text-center text-xs text-white/35">Loading team progress…</div>
-              ) : teamDiscipline.length === 0 ? (
-                <div className="py-8 text-center text-xs text-white/25">No team members found.</div>
-              ) : (
-                teamDiscipline.map((person, idx) => (
-                  <MemberStoryCard key={`${person.id || person.name}-${idx}`} person={person} />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* NOTIFICATIONS */}
-          <div className={`${cardClass} flex flex-col`}>
-            <div className="mb-5 flex shrink-0 items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-400/15 text-[#78aaff]">
-                  <FaBell />
-                </span>
-                <h3 className="text-[17px] font-bold">Notifications</h3>
-              </div>
-              <Link
-                to="/notifications"
-                className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100"
-              >
-                View All <FaArrowRight />
-              </Link>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
-              {loadingNotif ? (
-                <div className="py-8 text-center text-xs text-white/35">Loading notifications…</div>
-              ) : notifications.length === 0 ? (
-                <div className="py-8 text-center text-xs text-white/25">No notifications found.</div>
-              ) : (
-                notifications.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]"
-                  >
-                    <div className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.style?.color}`}>
-                      {item.style?.icon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="truncate text-[13px] font-bold">{item.title}</h4>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/55">{item.desc}</p>
-                    </div>
-                    <span className="whitespace-nowrap text-[10px] text-white/35">{item.time}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
+          </AnimatedCard>
+        ))}
       </div>
-    </MainLayout>
-  );
+
+      <div className="grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-2 lg:grid-rows-[minmax(250px,0.95fr)_minmax(250px,1fr)] xl:gap-6">
+        <AnimatedCard delay={0.12} className={cardClass}>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-[17px] font-bold">Project Progress</h3>
+            <span className="rounded-full bg-blue-400/15 px-3 py-1 text-[10px] font-bold text-[#78aaff]">
+              This Month
+            </span>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-[160px_1fr] sm:items-center lg:h-[calc(100%-44px)] lg:grid-cols-[190px_1fr] lg:gap-7">
+            <div
+              className="relative mx-auto h-[150px] w-[150px] rounded-full shadow-[0_0_38px_rgba(69,230,139,.20)] lg:h-[175px] lg:w-[175px]"
+              style={{
+                "--done": `${projectProgressStats.donePercent * 3.6}deg`,
+                "--inp": `${projectProgressStats.inProgressPercent * 3.6}deg`,
+                background: `conic-gradient(
+                  ${PROJECT_STATUS_COLORS.done} 0deg var(--done),
+                  ${PROJECT_STATUS_COLORS.gap} var(--done) calc(var(--done) + 6deg),
+                  ${PROJECT_STATUS_COLORS.inProgress} calc(var(--done) + 6deg) calc(var(--done) + 6deg + var(--inp)),
+                  ${PROJECT_STATUS_COLORS.gap} calc(var(--done) + 6deg + var(--inp)) calc(var(--done) + 12deg + var(--inp)),
+                  ${PROJECT_STATUS_COLORS.todo} calc(var(--done) + 12deg + var(--inp)) 360deg
+                )`,
+              }}
+            >
+              <div className="absolute inset-[25px] rounded-full bg-[#0b123f]" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-[30px] font-extrabold lg:text-[34px]">
+                  {projectProgressStats.donePercent}%
+                </span>
+                <span className="text-[11px] text-white/65">Completed</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {projectProgressItems.map(([label, value, color]) => (
+                <div key={label}>
+                  <div className="mb-2 flex items-center justify-between text-[12px]">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-white/70">{label}</span>
+                    </div>
+                    <b>{value}</b>
+                  </div>
+                  <div className="h-[6px] rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: value, backgroundColor: color }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </AnimatedCard>
+
+        <AnimatedCard delay={0.18} className={cardClass}>
+          <div className="mb-5 flex items-center justify-between">
+            <h3 className="text-[17px] font-bold">Tasks Progress</h3>
+            <FaChartBar className="text-[#78aaff]" />
+          </div>
+
+          <div className="relative mx-auto h-[180px] w-full max-w-[620px] sm:w-[88%] lg:h-[clamp(156px,20vh,205px)]">
+            {["18%", "42%", "66%", "90%"].map((top) => (
+              <div
+                key={top}
+                style={{ top }}
+                className="absolute left-0 right-0 h-px bg-white/10"
+              />
+            ))}
+
+            <div className="absolute inset-0 flex items-end justify-around pb-6">
+              {storyBarData.map(([name, value]) => (
+                <div key={name} className="flex min-w-0 flex-col items-center">
+                  <div className="relative flex h-[clamp(98px,13vh,135px)] w-[clamp(30px,3.4vw,38px)] items-end rounded-[14px] bg-white/10 p-[4px]">
+                    <div
+                      style={{ height: `${value}%` }}
+                      className="w-full rounded-[10px] bg-gradient-to-t from-[#6eb5ff] to-[#5b7dff] shadow-[0_0_20px_rgba(95,150,255,.35)] transition-all duration-500"
+                    />
+                  </div>
+
+                  <span className="mt-2 max-w-[50px] truncate text-center text-[10px] text-white/75">
+                    {name}
+                  </span>
+                  <span className="mt-1 text-[9px] text-[#78aaff]">
+                    {value}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </AnimatedCard>
+
+        <AnimatedCard delay={0.24} className={`${cardClass} flex flex-col`}>
+          <div className="mb-5 flex shrink-0 items-center justify-between">
+            <div>
+              <h3 className="text-[17px] font-bold">Team Discipline</h3>
+              <p className="mt-0.5 text-[11px] text-white/35">
+                Click a member to see their stories
+              </p>
+            </div>
+
+            <Link
+              to="/teams"
+              className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100"
+            >
+              View Team <FaArrowRight />
+            </Link>
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+            {loadingDiscipline ? (
+              <div className="py-8 text-center text-xs text-white/35">
+                Loading team progressâ€¦
+              </div>
+            ) : teamDiscipline.length === 0 ? (
+              <div className="py-8 text-center text-xs text-white/25">
+                No team members found.
+              </div>
+            ) : (
+              teamDiscipline.map((person, idx) => (
+                <MemberStoryCard
+                  key={`${person.id || person.name}-${idx}`}
+                  person={person}
+                />
+              ))
+            )}
+          </div>
+        </AnimatedCard>
+
+        <AnimatedCard delay={0.3} className={`${cardClass} flex flex-col`}>
+          <div className="mb-5 flex shrink-0 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-400/15 text-[#78aaff]">
+                <FaBell />
+              </span>
+              <h3 className="text-[17px] font-bold">Notifications</h3>
+            </div>
+
+            <Link
+              to="/notifications"
+              className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-100"
+            >
+              View All <FaArrowRight />
+            </Link>
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
+            {loadingNotif ? (
+              <div className="py-8 text-center text-xs text-white/35">
+                Loading notificationsâ€¦
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="py-8 text-center text-xs text-white/25">
+                No notifications found.
+              </div>
+            ) : (
+              notifications.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-start gap-4 rounded-[20px] bg-[#10184c]/60 p-4 transition hover:bg-[#151f62]"
+                >
+                  <div
+                    className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.style?.color}`}
+                  >
+                    {item.style?.icon}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate text-[13px] font-bold">
+                      {item.title}
+                    </h4>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/55">
+                      {item.desc}
+                    </p>
+                  </div>
+
+                  <span className="whitespace-nowrap text-[10px] text-white/35">
+                    {item.time}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </AnimatedCard>
+        
+      </div>
+    </div>
+  </MainLayout>
+);
 }

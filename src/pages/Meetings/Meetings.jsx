@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "../../layout/MainLayout";
 import { JitsiMeeting } from "@jitsi/react-sdk";
+import { useNavigate } from "react-router-dom";
+
 import {
   FaMicrophone,
   FaMicrophoneSlash,
@@ -96,6 +98,7 @@ function generateAiReply(message) {
 }
 
 export default function Meetings() {
+  const navigate = useNavigate();
   const [inMeeting, setInMeeting] = useState(false);
   const [endModal, setEndModal] = useState(false);
   const [roomId, setRoomId] = useState("");
@@ -258,13 +261,15 @@ export default function Meetings() {
     setMessages((prev) => [...prev, aiReply]);
   };
 
-  const backToStart = () => {
-    setEndModal(false);
-    setInMeeting(false);
-    setRoomId("");
-    setMessages(initialMessages);
-    setAiTyping(false);
-  };
+ const backToStart = () => {
+  setEndModal(false);
+  setInMeeting(false);
+  setRoomId("");
+  setMessages(initialMessages);
+  setAiTyping(false);
+
+  navigate("/summary");
+};
 
   const ControlButton = ({ active, onClick, children }) => (
     <button
@@ -553,7 +558,7 @@ export default function Meetings() {
                     onClick={backToStart}
                     className="mt-6 h-11 w-full rounded-[16px] bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff] text-sm font-bold"
                   >
-                    Go to Dashboard
+                   Open Meeting Summary
                   </button>
                 </div>
               </div>

@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 
 import {
@@ -101,7 +100,7 @@ export default function RecentActivity() {
   const filteredItems = items.filter((item) =>
     `${item.title} ${item.desc} ${item.action}`
       .toLowerCase()
-      .includes(search.toLowerCase())
+      .includes(search.toLowerCase()),
   );
 
   const selectedCount = items.filter((item) => item.checked).length;
@@ -110,8 +109,8 @@ export default function RecentActivity() {
   const toggle = (id) => {
     setItems((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, checked: !item.checked } : item
-      )
+        item.id === id ? { ...item, checked: !item.checked } : item,
+      ),
     );
   };
 
@@ -120,9 +119,8 @@ export default function RecentActivity() {
       prev.map((item) => ({
         ...item,
         checked: !allSelected,
-      }))
+      })),
     );
-
     setOpen(false);
   };
 
@@ -137,20 +135,20 @@ export default function RecentActivity() {
         item.id === id
           ? {
               ...item,
-              action: "Accepted",
+              action: "Open Meeting",
               status: "accepted",
               checked: false,
               color: "from-[#5fffd0] to-[#35b7ff]",
               icon: <FaCheckCircle />,
             }
-          : item
-      )
+          : item,
+      ),
     );
   };
 
   const actionClass = (item) => {
     if (item.status === "accepted") {
-      return "bg-emerald-400/15 text-[#5fffd0] cursor-default";
+      return "bg-emerald-400/15 text-[#5fffd0] hover:bg-emerald-400/25";
     }
 
     if (item.action === "Accept") {
@@ -165,10 +163,14 @@ export default function RecentActivity() {
   };
 
   const handleAction = (item) => {
-    if (item.status === "accepted") return;
-
     if (item.action === "Accept") {
       acceptInvitation(item.id);
+      setTimeout(() => navigate("/meetings"), 400);
+      return;
+    }
+
+    if (item.status === "accepted") {
+      navigate("/meetings");
       return;
     }
 
@@ -181,7 +183,6 @@ export default function RecentActivity() {
   return (
     <MainLayout>
       <div className="min-h-0 text-white lg:h-full lg:overflow-hidden">
-        {/* PAGE HEADER */}
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -210,12 +211,10 @@ export default function RecentActivity() {
           </div>
         </div>
 
-        {/* CONTENT */}
         <div className={`${cardClass} flex flex-col p-4 sm:p-7 lg:h-[calc(100%-58px)]`}>
           <div className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="pointer-events-none absolute -right-16 bottom-0 h-44 w-44 rounded-full bg-purple-500/10 blur-3xl" />
 
-          {/* TOP BAR */}
           <div className="relative z-20 mb-5 flex items-center justify-between">
             <div className="flex gap-3">
               <div className="rounded-[20px] bg-[#10184c]/80 px-4 py-3">
@@ -257,7 +256,8 @@ export default function RecentActivity() {
 
                   <button
                     onClick={deleteSelected}
-                    className="flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-[12px] font-semibold text-[#ff6b8a] transition hover:bg-red-400/15"
+                    disabled={selectedCount === 0}
+                    className="flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-[12px] font-semibold text-[#ff6b8a] transition hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <FaTrash />
                     Delete
@@ -267,7 +267,6 @@ export default function RecentActivity() {
             </div>
           </div>
 
-          {/* LIST */}
           <div className="relative z-10 min-h-0 flex-1 overflow-y-auto pr-3">
             {filteredItems.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
@@ -285,15 +284,18 @@ export default function RecentActivity() {
               filteredItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`mb-4 grid min-h-[78px] grid-cols-[34px_44px_1fr] items-center gap-3 rounded-[20px] border px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,.20)] transition-all duration-300 hover:-translate-y-[2px] sm:grid-cols-[34px_48px_1fr_110px_110px] sm:gap-5 sm:rounded-[24px] sm:px-5 ${
+                  onDoubleClick={() => handleAction(item)}
+                  className={`mb-4 grid min-h-[78px] cursor-pointer grid-cols-[34px_44px_1fr] items-center gap-3 rounded-[20px] border px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,.20)] transition-all duration-300 hover:-translate-y-[2px] sm:grid-cols-[34px_48px_1fr_110px_110px] sm:gap-5 sm:rounded-[24px] sm:px-5 ${
                     item.checked
                       ? "border-blue-300/25 bg-gradient-to-r from-[#1c2a87]/95 to-[#141f69]/95"
                       : "border-white/5 bg-[#11194c]/92 hover:bg-[#162061]"
                   }`}
                 >
-                  {/* CHECKBOX */}
                   <button
-                    onClick={() => toggle(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggle(item.id);
+                    }}
                     className={`flex h-[18px] w-[18px] items-center justify-center rounded-full border transition ${
                       item.checked
                         ? "border-transparent bg-gradient-to-r from-[#6eb5ff] to-[#5b7dff]"
@@ -303,14 +305,12 @@ export default function RecentActivity() {
                     {item.checked && <FaCheck className="text-[8px]" />}
                   </button>
 
-                  {/* ICON */}
                   <div
                     className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-b ${item.color} text-white shadow-[0_0_18px_rgba(255,255,255,.10)]`}
                   >
                     {item.icon}
                   </div>
 
-                  {/* TEXT */}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h4 className="truncate text-[13px] font-bold tracking-[-0.1px]">
@@ -335,17 +335,16 @@ export default function RecentActivity() {
                     </p>
                   </div>
 
-                  {/* TIME */}
                   <span className="text-center text-[11px] text-white/45">
                     {item.time}
                   </span>
 
-                  {/* ACTION */}
                   <button
-                    onClick={() => handleAction(item)}
-                    className={`flex h-9 items-center justify-center rounded-full text-[12px] font-bold transition ${actionClass(
-                      item
-                    )}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAction(item);
+                    }}
+                    className={`flex h-9 items-center justify-center rounded-full text-[12px] font-bold transition ${actionClass(item)}`}
                   >
                     {item.action}
                   </button>

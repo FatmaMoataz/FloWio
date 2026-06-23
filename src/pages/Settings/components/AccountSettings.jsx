@@ -5,6 +5,7 @@ import {
   FaGithub, FaFacebookF, FaUndo, FaSpinner,
 } from "react-icons/fa";
 import userService from "../../../services/userService";
+import { saveFlowioUser } from "../../../components/User/userProfile";
 
 // const DEFAULT_AVATAR = "https://i.pravatar.cc/300?img=12";
 
@@ -158,6 +159,13 @@ export default function AccountSettings() {
 
       // await userService.updateProfile(payload);
       await userService.updateProfile(payload);
+      saveFlowioUser({
+  name: account.fullName,
+  email: account.email,
+  avatar: pendingAvatarUrl !== null ? pendingAvatarUrl || "" : avatar || "",
+  role: account.role,
+  specialization: account.specialization,
+});
 if (pendingAvatarUrl !== null) {
   localStorage.setItem("userAvatar", pendingAvatarUrl || "");
 }
