@@ -4,10 +4,10 @@ import { toast } from "react-toastify";
 import {
   FaArrowRight,
   FaBolt,
-  FaBuilding,
   FaCheck,
   FaCheckCircle,
   FaCrown,
+  FaGift,
   FaMinus,
   FaPaperPlane,
   FaPlus,
@@ -22,58 +22,61 @@ import companyService from "../../services/companyService";
 import subscriptionService from "../../services/subscriptionService";
 import invitationService from "../../services/invitationService";
 
-// Plan ids now match the backend's subscriptionPlan enum exactly
-// (free | starter | pro | enterprise) — no more translation layer needed.
+// Fully synced with your active Stripe Pricing
 const plans = [
+  {
+    id: "free",
+    name: "Free",
+    type: "free",
+    monthly: 0,
+    yearly: 0,
+    icon: <FaGift />,
+    description: "Try Flowio with no cost and no credit card.",
+    limit: 5,
+    features: [
+      "Up to 5 users",
+      "3 projects",
+      "1GB storage",
+      "Basic task boards",
+    ],
+  },
   {
     id: "starter",
     name: "Starter",
-    monthly: 19,
+    type: "paid",
+    monthly: 5.00,
+    yearly: 40.00,
     icon: <FaRocket />,
     description: "Perfect for small teams getting started.",
-    limit: 5,
+    limit: 20, // Max 20 users
     features: [
-      "Up to 5 team members",
-      "3 active projects",
-      "AI tools (basic)",
+      "Up to 20 users",
+      "5 projects per month",
       "10GB storage",
-      "Email support",
+      "Limited meeting summaries",
     ],
   },
   {
     id: "pro",
     name: "Pro",
-    monthly: 49,
+    type: "paid",
+    monthly: 10.00,
+    yearly: 84.00,
     icon: <FaBolt />,
     description: "Built for growing teams and advanced workflows.",
-    limit: 20,
+    limit: null, // null = unlimited users
     popular: true,
     features: [
-      "Up to 20 team members",
+      "Unlimited users",
       "Unlimited projects",
-      "AI tools (advanced)",
-      "100GB storage",
-      "Priority support",
-      "Advanced analytics",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    monthly: null,
-    icon: <FaBuilding />,
-    description: "For large organizations with custom requirements.",
-    limit: null, // unlimited — no self-serve seat selector
-    features: [
-      "Unlimited team members",
-      "Unlimited projects",
-      "AI tools (enterprise)",
-      "Unlimited storage",
-      "SLA and premium support",
-      "Advanced security",
+      "4 meetings per month - summarized by AI",
     ],
   },
 ];
+
+// Whichever plan is flagged `popular` is the default selection — stays in
+// sync automatically if the badge ever moves to a different plan.
+const defaultPlan = plans.find((item) => item.popular) || plans[0];
 
 export default function CompanyOnboarding() {
   const navigate = useNavigate();
@@ -81,27 +84,29 @@ export default function CompanyOnboarding() {
 
   const [step, setStep] = useState(2);
   const [billing, setBilling] = useState("monthly");
-  const [selectedPlan, setSelectedPlan] = useState("pro");
-  const [seats, setSeats] = useState(10);
+  const [selectedPlan, setSelectedPlan] = useState(defaultPlan.id);
+
+  // Default users is 1
+  const [seats, setSeats] = useState(1);
+
   const [emailInput, setEmailInput] = useState("");
   const [emails, setEmails] = useState([]);
-  const [inviteRole, setInviteRole] = useState("Member"); // UI only for now — see note below
+  const [inviteRole, setInviteRole] = useState("Member");
 
   const [company, setCompany] = useState(null);
   const [isLoadingCompany, setIsLoadingCompany] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isSendingInvites, setIsSendingInvites] = useState(false);
 
-  const plan = plans.find((item) => item.id === selectedPlan) || plans[1];
-  const billingMonths = billing === "yearly" ? 10 : 1;
-  // FIXED: price now actually reflects seat count, matching what Stripe will
-  // charge (quantity = seats). The original version ignored seats entirely.
-  const subtotal = plan.monthly ? plan.monthly * seats * billingMonths : 0;
-  const tax = subtotal * 0.1;
-  const total = subtotal + tax;
+  const plan = plans.find((item) => item.id === selectedPlan) || defaultPlan;
 
-  // Load the real company on mount so plan/seats reflect server state
-  // instead of starting from arbitrary defaults every time.
+  const pricePerUser = billing === "yearly" ? plan.yearly : plan.monthly;
+  // No tax — Stripe isn't configured to charge any on this checkout session,
+  // so the subtotal IS the total. Don't show a number Stripe won't actually
+  // bill (see SETUP_NOTES.md if that ever changes via Stripe Tax).
+  const subtotal = plan.type === "paid" ? pricePerUser * seats : 0;
+
+  // Load company data
   useEffect(() => {
     (async () => {
       try {
@@ -109,9 +114,6 @@ export default function CompanyOnboarding() {
         setCompany(data);
         if (data?.subscriptionPlan && data.subscriptionPlan !== "free") {
           setSelectedPlan(data.subscriptionPlan);
-          // Free plan always stores seats: 1 — that's meaningless for a
-          // paid plan, so only trust the stored seat count when the
-          // company is actually on a paid plan.
           if (data?.seats) setSeats(data.seats);
           if (data?.billingCycle) setBilling(data.billingCycle);
         }
@@ -123,9 +125,7 @@ export default function CompanyOnboarding() {
     })();
   }, []);
 
-  // Handles the redirect back from Stripe Checkout:
-  //   /onboarding?step=invite&session_id=cs_test_...   (success)
-  //   /onboarding?step=plan&canceled=true               (canceled)
+  // Handle Stripe return
   useEffect(() => {
     const sessionId = searchParams.get("session_id");
     const canceled = searchParams.get("canceled");
@@ -153,12 +153,12 @@ export default function CompanyOnboarding() {
         setSearchParams({}, { replace: true });
       }
     })();
-    // run once on mount only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectPlan = (nextPlan) => {
     setSelectedPlan(nextPlan.id);
+    // Only cap users if the plan has a limit, otherwise let them be unlimited
     if (nextPlan.limit) {
       setSeats((current) => Math.min(current, nextPlan.limit));
     }
@@ -166,7 +166,6 @@ export default function CompanyOnboarding() {
 
   const addEmail = () => {
     const email = emailInput.trim().toLowerCase();
-
     if (!email) return;
     if (!/\S+@\S+\.\S+/.test(email)) {
       toast.warning("Enter a valid email address.");
@@ -176,7 +175,6 @@ export default function CompanyOnboarding() {
       toast.info("That email is already in the invitation list.");
       return;
     }
-
     setEmails((current) => [...current, email]);
     setEmailInput("");
   };
@@ -185,16 +183,9 @@ export default function CompanyOnboarding() {
     setEmails((current) => current.filter((item) => item !== email));
   };
 
-  // Replaces the old "set step to 3" no-op with the real flow:
-  // free → confirm instantly, paid → redirect to Stripe Checkout, enterprise → email sales.
   const goToCheckout = async (planId) => {
     if (!company) {
       toast.error("Your company isn't loaded yet — try again in a moment.");
-      return;
-    }
-
-    if (planId === "enterprise") {
-      window.location.href = "mailto:sales@flowio.app?subject=Enterprise%20plan";
       return;
     }
 
@@ -214,7 +205,7 @@ export default function CompanyOnboarding() {
       }
 
       if (result.url) {
-        window.location.href = result.url; // leaves the app for Stripe Checkout
+        window.location.href = result.url;
       }
     } catch (error) {
       toast.error(error.message || "Could not start checkout.");
@@ -223,8 +214,6 @@ export default function CompanyOnboarding() {
     }
   };
 
-  // Replaces the old fake "invite link" + toast-only sendInvites with real
-  // per-email POSTs to /api/invitations.
   const sendInvites = async () => {
     if (emails.length === 0) {
       toast.warning("Add at least one teammate email.");
@@ -263,11 +252,9 @@ export default function CompanyOnboarding() {
   };
 
   const continueLabel =
-    selectedPlan === "enterprise"
-      ? "Contact Sales"
-      : selectedPlan === "free"
-        ? "Continue with Free plan"
-        : "Continue to Checkout";
+    selectedPlan === "free"
+      ? "Continue with Free plan"
+      : "Continue to Checkout";
 
   return (
     <div className="flowio-auth-page min-h-screen bg-[radial-gradient(circle_at_bottom,#071c75_0%,#020617_38%,#030616_100%)] p-3 text-white sm:p-6">
@@ -313,7 +300,7 @@ export default function CompanyOnboarding() {
           </div>
         </header>
 
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_.85fr]">
+        <div className="grid gap-6 xl:grid-cols-[1.45fr_.85fr]">
           <section className="rounded-[20px] border border-blue-300/10 bg-[#0a1033]/85 p-3 sm:rounded-[22px] sm:p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -340,7 +327,7 @@ export default function CompanyOnboarding() {
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {plans.map((item) => {
                 const selected = selectedPlan === item.id;
 
@@ -369,24 +356,32 @@ export default function CompanyOnboarding() {
                     </p>
 
                     <div className="my-4 sm:my-5">
-                      {item.monthly ? (
-                        <>
-                          <span className="text-3xl font-extrabold sm:text-4xl">
-                            ${billing === "yearly" ? (item.monthly * 10 / 12).toFixed(2) : item.monthly}
-                          </span>
-                          <span className="ml-1 text-xs text-white/55">/seat/mo</span>
-                          {billing === "yearly" ? (
+                      {item.type === "paid" ? (
+                        billing === "yearly" ? (
+                          <>
+                            {/* Yearly total is the dominant number — that's
+                                what's actually charged today. */}
+                            <span className="text-3xl font-extrabold sm:text-4xl">
+                              ${item.yearly.toFixed(2)}
+                            </span>
+                            <span className="ml-1 text-xs text-white/55">/user/yr</span>
                             <p className="mt-1 text-xs text-white/45">
-                              billed annually — ${item.monthly * 10}/seat/yr
+                              ${(item.yearly / 12).toFixed(2)}/user/mo
                             </p>
-                          ) : (
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-3xl font-extrabold sm:text-4xl">
+                              ${item.monthly}
+                            </span>
+                            <span className="ml-1 text-xs text-white/55">/user/mo</span>
                             <p className="mt-1 text-xs text-white/45">billed monthly</p>
-                          )}
-                        </>
+                          </>
+                        )
                       ) : (
                         <>
-                          <span className="text-2xl font-extrabold">Custom</span>
-                          <p className="mt-1 text-xs text-white/45">Contact sales</p>
+                          <span className="text-3xl font-extrabold sm:text-4xl">$0</span>
+                          <p className="mt-1 text-xs text-white/45">free forever</p>
                         </>
                       )}
                     </div>
@@ -403,7 +398,11 @@ export default function CompanyOnboarding() {
                     <span className={`mt-5 flex h-11 items-center justify-center rounded-[14px] font-bold lg:mt-auto ${
                       selected ? "bg-[#245df5] text-white" : "bg-[#19265f] text-white/85"
                     }`}>
-                      {selected ? "Selected" : item.monthly ? `Choose ${item.name}` : "Contact Sales"}
+                      {selected
+                        ? "Selected"
+                        : item.type === "paid"
+                          ? `Choose ${item.name}`
+                          : "Choose Free"}
                     </span>
                   </button>
                 );
@@ -419,18 +418,32 @@ export default function CompanyOnboarding() {
                   <div>
                     <p className="font-bold">{plan.name} Plan</p>
                     <p className="mt-1 text-xs text-white/50">
-                      {plan.limit ? `Up to ${plan.limit} team members` : "Unlimited team members"}
+                      {plan.limit
+                        ? `Up to ${plan.limit} user${plan.limit === 1 ? "" : "s"}`
+                        : "Unlimited users"}
                     </p>
                   </div>
                 </div>
 
-                {plan.monthly ? (
+                {plan.type === "paid" ? (
                   <div>
-                    <p className="mb-2 text-xs text-white/55">Seats</p>
+                    <p className="mb-2 text-xs text-white/55">Users</p>
                     <div className="flex h-10 w-full max-w-[180px] items-center justify-between rounded-xl border border-white/15">
-                      <button type="button" onClick={() => setSeats((current) => Math.max(1, current - 1))} className="h-full px-4"><FaMinus /></button>
+                      <button
+                        type="button"
+                        onClick={() => setSeats((current) => Math.max(1, current - 1))}
+                        className="h-full px-4"
+                      >
+                        <FaMinus />
+                      </button>
                       <span className="min-w-10 text-center font-bold">{seats}</span>
-                      <button type="button" onClick={() => setSeats((current) => Math.min(plan.limit, current + 1))} className="h-full px-4"><FaPlus /></button>
+                      <button
+                        type="button"
+                        onClick={() => setSeats((current) => plan.limit ? Math.min(plan.limit, current + 1) : current + 1)}
+                        className="h-full px-4"
+                      >
+                        <FaPlus />
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -438,11 +451,16 @@ export default function CompanyOnboarding() {
                 )}
 
                 <div className="space-y-2 text-sm">
-                  {plan.monthly ? (
+                  {plan.type === "paid" ? (
                     <>
-                      <p className="flex justify-between gap-4"><span className="text-white/55">Subtotal ({seats} seats)</span><b>${subtotal.toFixed(2)}</b></p>
-                      <p className="flex justify-between gap-4"><span className="text-white/55">Tax (10%)</span><b>${tax.toFixed(2)}</b></p>
-                      <p className="flex justify-between gap-4 border-t border-white/10 pt-2 text-base"><span>Total due today</span><b className="text-[#64CFFF]">${total.toFixed(2)}</b></p>
+                      <p className="flex justify-between gap-4">
+                        <span className="text-white/55">{seats} user{seats > 1 ? "s" : ""} × ${pricePerUser.toFixed(2)}</span>
+                        <b>${subtotal.toFixed(2)}</b>
+                      </p>
+                      <p className="flex justify-between gap-4 border-t border-white/10 pt-2 text-base">
+                        <span>Total due today</span>
+                        <b className="text-[#64CFFF]">${subtotal.toFixed(2)}</b>
+                      </p>
                       {billing === "yearly" && (
                         <p className="text-right text-[11px] text-white/40">
                           Billed once for the year — renews annually
@@ -450,7 +468,7 @@ export default function CompanyOnboarding() {
                       )}
                     </>
                   ) : (
-                    <p className="text-white/65">Our sales team will create custom pricing for your organization.</p>
+                    <p className="text-white/65">No credit card required — upgrade anytime as your team grows.</p>
                   )}
                 </div>
               </div>
@@ -471,17 +489,6 @@ export default function CompanyOnboarding() {
                   </>
                 )}
               </button>
-
-              {selectedPlan !== "free" && (
-                <button
-                  type="button"
-                  onClick={() => goToCheckout("free")}
-                  disabled={isCheckingOut || isLoadingCompany}
-                  className="mx-auto mt-3 block text-center text-xs font-semibold text-white/45 underline-offset-2 hover:text-white/70 hover:underline"
-                >
-                  Skip for now — stay on the Free plan
-                </button>
-              )}
 
               <p className="mt-3 flex items-center justify-center gap-2 text-xs text-white/45">
                 <FaShieldAlt /> Payments are processed securely by Stripe.
@@ -535,8 +542,6 @@ export default function CompanyOnboarding() {
               </div>
             </div>
 
-            {/* NOTE: the invitation model/route don't currently store a role —
-                this selector is UI-only until that's added on the backend. */}
             <label className="mt-5 block">
               <span className="mb-2 block text-sm font-semibold">Role for invited members</span>
               <select
