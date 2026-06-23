@@ -46,7 +46,6 @@ const projectService = {
     }
   },
 
-  // ✅ NEW: Archive a project using the dedicated archive endpoint
   archiveProject: async (projectId) => {
     try {
       const response = await API.post(`/api/archive/project/${projectId}`);
@@ -56,7 +55,6 @@ const projectService = {
     }
   },
 
-  // ✅ NEW: Restore (unarchive) a project
   restoreProject: async (projectId) => {
     try {
       const response = await API.delete(`/api/archive/${projectId}`);
@@ -66,7 +64,6 @@ const projectService = {
     }
   },
 
-  // ✅ NEW: Get all archived items for a company
   getArchivedByCompany: async (companyId) => {
     try {
       const response = await API.get(`/api/archive/company/${companyId}`);

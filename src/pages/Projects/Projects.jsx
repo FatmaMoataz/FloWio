@@ -320,7 +320,7 @@ function SubtasksPanel({ storyId, accentColor, companyId }) {
   );
 }
 
-function ProjectMenu({ project, onClose, onArchive, onDelete }) {
+function ProjectMenu({ project, onClose, onArchive, onRestore, onDelete }) {
   const navigate = useNavigate();
   const menuRef = useRef(null);
   const isArchived = getProjectDisplayStatus(project) === "archived";
@@ -364,7 +364,16 @@ function ProjectMenu({ project, onClose, onArchive, onDelete }) {
             },
           },
         ]
-      : []),
+      : [
+          {
+            label: "Restore",
+            icon: FaSync,
+            onClick: () => {
+              onClose();
+              onRestore();
+            },
+          },
+        ]),
     {
       label: "Delete",
       icon: FaTrashAlt,
@@ -455,6 +464,7 @@ function ProjectCard({
   openMenuId,
   setOpenMenuId,
   onArchive,
+  onRestore,
   onDelete,
   onClick,
 }) {
@@ -557,6 +567,7 @@ function ProjectCard({
                     project={project}
                     onClose={() => setOpenMenuId(null)}
                     onArchive={() => onArchive(project)}
+                    onRestore={() => onRestore(project)}
                     onDelete={() => onDelete(project)}
                   />
                 )}
@@ -754,40 +765,75 @@ export default function Projects() {
     }
   };
 
-const handleArchiveProject = async (project) => {
-  const projectId = project?._id;
-  if (!projectId) return;
+  const handleArchiveProject = async (project) => {
+    const projectId = project?._id;
+    if (!projectId) return;
 
-  setOpenMenuId(null);
+    setOpenMenuId(null);
 
-  // Optimistic update - update local state immediately
-  setProjects((prev) =>
-    prev.map((item) =>
-      item._id === projectId
-        ? { ...item, status: "archived", isArchived: true, archivedAt: new Date().toISOString() }
-        : item,
-    ),
-  );
-
-  try {
-    // Use the dedicated archive endpoint (POST, not PUT)
-    await projectService.archiveProject(projectId);
-    
-    // Switch to Archived tab to show the archived project
-    setFilter("Archived");
-  } catch (err) {
-    // Revert on error
+    // Optimistic update - update local state immediately
     setProjects((prev) =>
-      prev.map((item) => (item._id === projectId ? project : item)),
+      prev.map((item) =>
+        item._id === projectId
+          ? { ...item, status: "archived", isArchived: true, archivedAt: new Date().toISOString() }
+          : item,
+      ),
     );
 
-    console.error("Failed to archive project:", err);
-    
-    // Show specific error message
-    const errorMessage = err.response?.data?.message || err.message || "Failed to archive project";
-    alert(errorMessage);
-  }
-};
+    try {
+      // Use the dedicated archive endpoint (POST, not PUT)
+      await projectService.archiveProject(projectId);
+      
+      // Switch to Archived tab to show the archived project
+      setFilter("Archived");
+    } catch (err) {
+      // Revert on error
+      setProjects((prev) =>
+        prev.map((item) => (item._id === projectId ? project : item)),
+      );
+
+      console.error("Failed to archive project:", err);
+      
+      // Show specific error message
+      const errorMessage = err.response?.data?.message || err.message || "Failed to archive project";
+      alert(errorMessage);
+    }
+  };
+
+  const handleRestoreProject = async (project) => {
+    const projectId = project?._id;
+    if (!projectId) return;
+
+    setOpenMenuId(null);
+
+    // Optimistic update - update local state immediately
+    setProjects((prev) =>
+      prev.map((item) =>
+        item._id === projectId
+          ? { ...item, status: "active", isArchived: false, archivedAt: null }
+          : item,
+      ),
+    );
+
+    try {
+      // Use the dedicated restore endpoint (DELETE /api/archive/:id)
+      await projectService.restoreProject(projectId);
+      
+      // Switch to Active tab to show the restored project
+      setFilter("Active");
+    } catch (err) {
+      // Revert on error
+      setProjects((prev) =>
+        prev.map((item) => (item._id === projectId ? project : item)),
+      );
+
+      console.error("Failed to restore project:", err);
+      
+      // Show specific error message
+      const errorMessage = err.response?.data?.message || err.message || "Failed to restore project";
+      alert(errorMessage);
+    }
+  };
 
   const visibleProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -916,6 +962,7 @@ const handleArchiveProject = async (project) => {
                   openMenuId={openMenuId}
                   setOpenMenuId={setOpenMenuId}
                   onArchive={handleArchiveProject}
+                  onRestore={handleRestoreProject}
                   onDelete={(projectItem) => setDeleteTarget(projectItem)}
                   onClick={(id) => navigate(`/projects/${id}`)}
                 />
