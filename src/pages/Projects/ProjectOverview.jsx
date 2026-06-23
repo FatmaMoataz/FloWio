@@ -27,7 +27,7 @@ export default function ProjectOverview() {
   const [error, setError] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [message, setMessage] = useState("");
-  const [assistantMessage, setAssistantMessage] = useState("Hello! I'm here to assist you.\nNeed help with your stories?");
+  const [assistantMessage, setAssistantMessage] = useState("Hello! I'm here to assist you.\nNeed help with your tasks?");
   const [storyUpdating, setStoryUpdating] = useState(null);
   const menuRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -118,7 +118,7 @@ export default function ProjectOverview() {
                   </div>
                 </div>
               </div>
-              <div className="mt-7 flex items-center justify-between"><h2 className="text-base font-semibold">Stories ({stories.length})</h2><button type="button" onClick={() => navigate(`/projects/${projectId}/details`)} className="text-xs text-[#79b4ff] hover:underline">Project details</button></div>
+              <div className="mt-7 flex items-center justify-between"><h2 className="text-base font-semibold">Tasks ({stories.length})</h2><button type="button" onClick={() => navigate(`/projects/${projectId}/details`)} className="text-xs text-[#79b4ff] hover:underline">Project details</button></div>
               <div className="flowio-overview-story-panel mt-5 rounded-[28px] border border-white/[0.025] bg-[radial-gradient(ellipse_at_50%_45%,rgba(29,42,91,.88),rgba(14,22,64,.96))] p-5 sm:p-6">
                 {stories.length > 0 ? (
                   <>
@@ -143,7 +143,7 @@ export default function ProjectOverview() {
                     )}
                   </>
                 ) : (
-                  <div className="flex min-h-40 items-center justify-center text-center"><div><p className="text-sm text-white/40">No stories yet</p><p className="mt-1 text-xs text-white/25">Stories track your project's work items</p></div></div>
+                  <div className="flex min-h-40 items-center justify-center text-center"><div><p className="text-sm text-white/40">No tasks yet</p><p className="mt-1 text-xs text-white/25">Tasks track your project's work items</p></div></div>
                 )}
               </div>
             </div>
@@ -157,8 +157,8 @@ export default function ProjectOverview() {
             </div>
             <div className="mt-7 flex justify-center"><AssistantAvatar /></div>
             <div className="flowio-ai-message mt-10 whitespace-pre-line rounded-[20px] bg-[#15204d] p-5 text-xs leading-6 text-white/70 max-h-48 overflow-y-auto">{assistantMessage}</div>
-            <button type="button" onClick={() => setAssistantMessage(`Story Management Tips:\n\n1. Group stories under epics\n2. Break stories into subtasks\n3. Track progress with statuses\n4. Update story status regularly\n\nCurrent progress: ${progress}% complete`)} className="flowio-ai-action mt-7 flex items-center gap-3 rounded-[17px] border border-white/[0.04] bg-[#15204d] px-4 py-3 text-left text-xs font-medium hover:bg-[#1a2557] transition"><FaPlus /> Story Tips</button>
-            <form onSubmit={sendMessage} className="flowio-ai-input mt-auto flex items-center rounded-[17px] border border-white/[0.05] bg-[#0b123f] px-4 py-3"><input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Ask about stories..." className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/25" /><button type="submit" className="text-[#5f9be8] hover:text-[#70a9ef] transition"><FaPaperPlane /></button></form>
+            <button type="button" onClick={() => setAssistantMessage(`Task Management Tips:\n\n1. Group tasks under epics\n2. Break tasks into subtasks\n3. Track progress with statuses\n4. Update task status regularly\n\nCurrent progress: ${progress}% complete`)} className="flowio-ai-action mt-7 flex items-center gap-3 rounded-[17px] border border-white/[0.04] bg-[#15204d] px-4 py-3 text-left text-xs font-medium hover:bg-[#1a2557] transition"><FaPlus /> Task Tips</button>
+            <form onSubmit={sendMessage} className="flowio-ai-input mt-auto flex items-center rounded-[17px] border border-white/[0.05] bg-[#0b123f] px-4 py-3"><input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Ask about tasks..." className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/25" /><button type="submit" className="text-[#5f9be8] hover:text-[#70a9ef] transition"><FaPaperPlane /></button></form>
           </aside>
         </div>
       </section>

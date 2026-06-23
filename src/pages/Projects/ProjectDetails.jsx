@@ -60,15 +60,15 @@ function StorySubtasks({ storyId }) {
   const handleToggle = async (subtaskId, isCompleted) => {
     setSubtasks((prev) => prev.map((s) => (s._id === subtaskId ? { ...s, isCompleted } : s)));
     try { await subtaskService.toggleSubtaskComplete(subtaskId, isCompleted); }
-    catch { fetchSubtasks(); }
+    catch { fetchSubTasks(); }
   };
 
-  if (loading) return <div className="flex items-center gap-2 py-2 text-[10px] text-white/30"><FaSpinner className="animate-spin" /> Loading subtasks...</div>;
-  if (subtasks.length === 0) return <p className="py-2 text-[10px] text-white/25">No subtasks yet.</p>;
+  if (loading) return <div className="flex items-center gap-2 py-2 text-[10px] text-white/30"><FaSpinner className="animate-spin" /> Loading subTasks...</div>;
+  if (subTasks.length === 0) return <p className="py-2 text-[10px] text-white/25">No subTasks yet.</p>;
 
   return (
     <div className="mt-2 space-y-1.5">
-      {subtasks.map((subtask) => {
+      {subTasks.map((subtask) => {
         const isDone = subtask.isCompleted || subtask.status === "Done";
         return (
           <button key={subtask._id} type="button" onClick={() => handleToggle(subtask._id, !isDone)} className="flex w-full items-center gap-2 text-left">
@@ -81,7 +81,7 @@ function StorySubtasks({ storyId }) {
   );
 }
 
-// ── A single story row, expandable to show its subtasks ─────────────────────
+// ── A single story row, expandable to show its subTasks ─────────────────────
 function StoryRow({ story }) {
   const [expanded, setExpanded] = useState(false);
   const done = isStoryDone(story);
@@ -109,14 +109,14 @@ function StoryRow({ story }) {
       {expanded && (
         <div className="mt-3 border-t border-white/5 pt-3 pl-6">
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider text-white/30">Subtasks</span>
+            <span className="text-[9px] uppercase tracking-wider text-white/30">SubTasks</span>
             {story.assignee && (
               <span className="flex items-center gap-1 text-[9px] text-white/35">
                 <FaUserCircle className="text-[8px]" />{story.assignee?.name || story.assignee?.email}
               </span>
             )}
           </div>
-          <StorySubtasks storyId={story._id} />
+          <StorySubTasks storyId={story._id} />
         </div>
       )}
     </div>
@@ -129,7 +129,7 @@ export default function ProjectDetails() {
 
   const [project, setProject] = useState(null);
   const [epics, setEpics] = useState([]);
-  const [stories, setStories] = useState([]);
+  const [Tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -153,14 +153,14 @@ export default function ProjectDetails() {
         setEpics([]);
       }
 
-      // ✅ Stories (not tasks) are what actually live under epics in this schema
+      // ✅ Tasks (not Tasks) are what actually live under epics in this schema
       try {
-        const storiesRes = await storyService.getStoriesByProject(projectId);
-        const data = storiesRes?.data || storiesRes || [];
-        setStories(Array.isArray(data) ? data : []);
+        const TasksRes = await storyService.getTasksByProject(projectId);
+        const data = TasksRes?.data || TasksRes || [];
+        setTasks(Array.isArray(data) ? data : []);
       } catch (storyErr) {
-        console.error("Could not load stories:", storyErr);
-        setStories([]);
+        console.error("Could not load Tasks:", storyErr);
+        setTasks([]);
       }
     } catch (err) {
       console.error("Error fetching project details:", err);
@@ -172,8 +172,8 @@ export default function ProjectDetails() {
 
   useEffect(() => { if (projectId) fetchProjectDetails(); }, [projectId, fetchProjectDetails]);
 
-  const getEpicStories = (epicId) => {
-    return stories.filter((story) => {
+  const getEpicTasks = (epicId) => {
+    return Tasks.filter((story) => {
       const sEpicId = story.epicId;
       if (!sEpicId) return false;
       if (typeof sEpicId === "object") return sEpicId._id === epicId || String(sEpicId) === epicId;
@@ -182,9 +182,9 @@ export default function ProjectDetails() {
   };
 
   const calculateProgress = () => {
-    if (stories.length === 0) return 0;
-    const doneStories = stories.filter(isStoryDone).length;
-    return Math.round((doneStories / stories.length) * 100);
+    if (Tasks.length === 0) return 0;
+    const doneTasks = Tasks.filter(isStoryDone).length;
+    return Math.round((doneTasks / Tasks.length) * 100);
   };
 
   if (loading) {
@@ -270,22 +270,22 @@ export default function ProjectDetails() {
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="flex items-center gap-2"><FaCalendarAlt className="text-[#5f9be8] text-sm" /><div><p className="text-[10px] text-white/40">Start Date</p><p className="text-xs font-medium">{formatDate(project.startDate)}</p></div></div>
             <div className="flex items-center gap-2"><FaCalendarAlt className="text-[#fab005] text-sm" /><div><p className="text-[10px] text-white/40">End Date</p><p className="text-xs font-medium">{formatDate(project.endDate)}</p></div></div>
-            <div className="flex items-center gap-2"><FaTasks className="text-[#20c997] text-sm" /><div><p className="text-[10px] text-white/40">Total Stories</p><p className="text-xs font-medium">{stories.length}</p></div></div>
+            <div className="flex items-center gap-2"><FaTasks className="text-[#20c997] text-sm" /><div><p className="text-[10px] text-white/40">Total Tasks</p><p className="text-xs font-medium">{Tasks.length}</p></div></div>
             <div className="flex items-center gap-2"><FaBookOpen className="text-[#7c5ce7] text-sm" /><div><p className="text-[10px] text-white/40">Epics</p><p className="text-xs font-medium">{epics.length}</p></div></div>
           </div>
         </div>
 
         <div className="mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Epics & Stories</h3>
-            <span className="text-xs text-white/40">{epics.length} epics, {stories.length} stories</span>
+            <h3 className="text-lg font-semibold">Epics & Tasks</h3>
+            <span className="text-xs text-white/40">{epics.length} epics, {Tasks.length} Tasks</span>
           </div>
 
           {epics.length > 0 ? (
             epics.map((epic, epicIndex) => {
-              const epicStories = getEpicStories(epic._id);
-              const epicProgress = epicStories.length > 0
-                ? Math.round((epicStories.filter(isStoryDone).length / epicStories.length) * 100)
+              const epicTasks = getEpicTasks(epic._id);
+              const epicProgress = epicTasks.length > 0
+                ? Math.round((epicTasks.filter(isStoryDone).length / epicTasks.length) * 100)
                 : 0;
 
               return (
@@ -296,7 +296,7 @@ export default function ProjectDetails() {
                       <span className={`rounded-full border px-4 py-1.5 text-[10px] font-medium ${getEpicStatusBadge(epic.status)}`}>{epic.status || "To Do"}</span>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-xs text-white/40">{epicStories.length} stories</span>
+                      <span className="text-xs text-white/40">{epicTasks.length} Tasks</span>
                       <span className="text-sm font-semibold" style={{ color: color.hex }}>{epicProgress}%</span>
                     </div>
                   </div>
@@ -308,12 +308,12 @@ export default function ProjectDetails() {
                   {epic.description && <p className="mt-4 text-xs text-white/45">{epic.description}</p>}
 
                   <div className="mt-5 flex-1 space-y-3">
-                    {epicStories.length > 0 ? (
-                      epicStories.map((story) => <StoryRow key={story._id} story={story} />)
+                    {epicTasks.length > 0 ? (
+                      epicTasks.map((story) => <StoryRow key={story._id} story={story} />)
                     ) : (
                       <div className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 text-center">
                         <FaTasks className="mb-2 text-lg text-white/20" />
-                        <p className="text-xs text-white/35">No stories assigned to this epic yet.</p>
+                        <p className="text-xs text-white/35">No Tasks assigned to this epic yet.</p>
                         <button onClick={() => navigate(`/projects/${projectId}/kanban`)} className="mt-2 flex items-center gap-1 text-[10px] text-[#5f9be8] hover:text-[#70a9ef] transition">
                           Go to Kanban Board
                         </button>
